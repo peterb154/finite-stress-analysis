@@ -26,25 +26,24 @@ def run(args):
     cases = pick_cases(cfg["cases"], args.cases)
     out = Path(args.out) if args.out else cfg["dir"] / "runs" / cfg["name"]
     out.mkdir(parents=True, exist_ok=True)
+    for old in [*out.glob("*_vm.png"), *out.glob("*_layer_*.png"), out / "summary.json", out / "results.vtu"]:
+        old.unlink(missing_ok=True)  # don't leave heat maps from an earlier run next to new results
 
     ids, xyz, tets, tris = mesh(cfg, size, fine)
     idx = np.zeros(ids.max() + 1, int)
     idx[ids] = np.arange(len(ids))
     surf = np.unique(tris)
-    sp = xyz[idx[surf]]
-    fixed = np.unique(np.concatenate([config.select(s, surf, sp) for s in cfg["fixed"]]))
-    paths = {n: (np.unique(config.select(p, surf, sp)), p["ref"]) for n, p in cfg["paths"].items()}
+    fixed, paths = select_bcs(cfg, surf, xyz[idx[surf]])
     print(
         f"mesh {size:g}/{fine:g} mm: {len(ids)} nodes, {len(tets)} tet10, fixed nodes {len(fixed)}, "
         + ", ".join(f"{n} nodes {len(v[0])}" for n, v in paths.items())
     )
-    for n, nodes in [("fixed", fixed), *((n, v[0]) for n, v in paths.items())]:
-        if len(nodes) == 0:
-            sys.exit(f"'{n}' selected no surface nodes: check its cylinders/boxes against the STEP coordinates")
 
     solve.write_inp(out / "model.inp", ids, xyz, tets, fixed, paths, cases, cfg["material"])
     solve.run_ccx(out)
     steps = solve.read_frd(out / "model.frd")
+    if len(steps) != len(cases):
+        raise RuntimeError(f"CalculiX wrote {len(steps)} result steps for {len(cases)} cases: see {out}/model.dat")
 
     bc_nodes = np.concatenate([fixed, *(v[0] for v in paths.values())])
     ok = ~post.near_bc(xyz, xyz[idx[bc_nodes]])
@@ -102,11 +101,32 @@ def run(args):
     print(f"wrote {out}/ in {time.time() - t0:.0f} s")
 
 
+def select_bcs(cfg, surf, sp):
+    """Surface nodes for the fixed supports and each load path. They must be non-empty and disjoint."""
+    fixed = np.unique(np.concatenate([config.select(s, surf, sp) for s in cfg["fixed"]]))
+    paths = {n: (np.unique(config.select(p, surf, sp)), p["ref"]) for n, p in cfg["paths"].items()}
+    groups = {"fixed": fixed, **{n: v[0] for n, v in paths.items()}}
+    for n, nodes in groups.items():
+        if len(nodes) == 0:
+            sys.exit(f"'{n}' selected no surface nodes: check its cylinders/boxes against the STEP coordinates")
+    names = list(groups)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            both = np.intersect1d(groups[a], groups[b])
+            if len(both):
+                sys.exit(f"'{a}' and '{b}' share {len(both)} surface nodes: a node can't be both. Shrink one.")
+    return fixed, paths
+
+
 def pick_cases(cases, sel):
     if not sel:
         return cases
     names = list(cases)
-    keep = [names[int(s) - 1] if s.isdigit() else s for s in sel.split(",")]
+    keep = []
+    for s in sel.split(","):
+        if s.isdigit() and not 1 <= int(s) <= len(names):
+            sys.exit(f"case number {s} out of range 1..{len(names)}")
+        keep.append(names[int(s) - 1] if s.isdigit() else s)
     unknown = [k for k in keep if k not in cases]
     if unknown:
         sys.exit(f"unknown case(s) {unknown}; have {names}")

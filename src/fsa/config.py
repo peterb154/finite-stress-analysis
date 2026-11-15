@@ -41,6 +41,8 @@ def load(path):
 
 
 def material(m):
+    if "preset" in m and m["preset"] not in MATERIALS:
+        raise ValueError(f"unknown material preset {m['preset']!r}; have {', '.join(MATERIALS)}")
     base = dict(MATERIALS[m["preset"]]) if "preset" in m else {}
     base.update({k: float(v) for k, v in m.items() if k != "preset"})
     missing = {"E", "nu", "inplane", "interlayer"} - base.keys()
@@ -53,6 +55,8 @@ def selector(s):
     """Surfaces picked by cylinders (hole walls, screw seats) and/or boxes."""
     cyls = []
     for c in s.get("cylinders", []):
+        if "point" not in c and "points" not in c:
+            raise ValueError(f"'{s.get('name')}': each cylinder needs point = [x, y, z] or points = [[..], ..]")
         for p in c.get("points", [c.get("point")]):
             span = c.get("span", [-BIG, BIG])
             cyls.append(
@@ -68,6 +72,8 @@ def case_loads(c, paths):
     """Sum a case's loads into (force, moment about ref) per load path."""
     out = {}
     for ld in c["loads"]:
+        if ld["path"] not in paths:
+            raise ValueError(f"case '{c['name']}': unknown load path {ld['path']!r}; have {list(paths)}")
         p = paths[ld["path"]]
         f = vec(ld.get("force", [0, 0, 0]))
         at = vec(ld["at"]) if "at" in ld else p["ref"]

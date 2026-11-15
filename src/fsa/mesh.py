@@ -5,12 +5,22 @@ def mesh(cfg, size, fine):
     import gmsh
 
     m = cfg["mesh"]
+    if not cfg["step"].is_file():
+        raise FileNotFoundError(
+            f"{cfg['step']} not found. It must be inside the folder fsa runs from (the container sees nothing else)."
+        )
     gmsh.initialize()
     try:
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.option.setString("Geometry.OCCTargetUnit", "MM")
         gmsh.model.occ.importShapes(str(cfg["step"]))
         gmsh.model.occ.synchronize()
+        vols = gmsh.model.getEntities(3)
+        if len(vols) != 1:
+            raise ValueError(
+                f"{cfg['step'].name} has {len(vols)} solid bodies; fsa needs exactly one. "
+                "Combine (boolean union) the bodies in CAD and re-export."
+            )
         if cfg["cuts"]:  # e.g. bore printed threads out to heat-set insert holes
             tools = [(3, gmsh.model.occ.addCylinder(*c["start"], *c["vector"], c["r"])) for c in cfg["cuts"]]
             gmsh.model.occ.cut(gmsh.model.getEntities(3), tools)

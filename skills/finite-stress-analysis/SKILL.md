@@ -54,3 +54,6 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
 - A rigid `load_path` makes whatever it touches infinitely stiff. Fine for a monitor or a steel bracket; for
   a soft neighbour, expect it to over-stiffen the part locally.
 - STEP units: fsa converts to mm. Check the coarse run's peak location is inside the part's bounding box.
+- The STEP must be one solid body inside the folder you run from. Union multi-body parts in CAD first.
+- A node can't be both fixed and in a load path (or in two load paths). fsa stops and names the pair;
+  shrink a cylinder's `r`/`span` or a box.
