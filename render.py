@@ -60,7 +60,7 @@ def render(name, field, vmax, xyz, tris, fields, out):
           "ZOOM plate + block (x<16), from below", xmax=16)
     sm = plt.cm.ScalarMappable(cmap="turbo", norm=plt.Normalize(0, vmax))
     fig.colorbar(sm, ax=fig.axes, shrink=0.6, label=f"MPa (red = at/over {vmax} MPa limit)")
-    fig.suptitle(f"{name}  |  {field}  |  peak {fields[field].max():.1f} MPa", fontsize=13)
+    fig.suptitle(f"{name}  |  {field}  |  raw max {fields[field].max():.1f} MPa (incl. bolt/fixed spots; see summary.json for the real peak)", fontsize=13)
     fig.savefig(out, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
