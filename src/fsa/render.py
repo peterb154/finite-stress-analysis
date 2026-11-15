@@ -18,7 +18,7 @@ def surface(tets):
 
 def panel(ax, xyz, tris, val, vmax, elev, azim, title, box=None):
     if box is not None:
-        tris = tris[((xyz[tris] >= box[0]) & (xyz[tris] <= box[1])).all((1, 2))]
+        tris = tris[((xyz[tris] >= box[0]) & (xyz[tris] <= box[1])).all(2).any(1)]
     p = xyz[tris]
     col = plt.cm.turbo(np.clip(val[tris].max(1), 0, vmax) / vmax)
     ax.add_collection3d(Poly3DCollection(p, facecolors=col, edgecolors="none"))
