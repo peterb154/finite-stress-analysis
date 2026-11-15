@@ -1,0 +1,25 @@
+#!/bin/sh
+# fsa: stress-check a 3D-printed part. Runs the solver in Docker on the current folder.
+#   fsa run part.toml [--coarse]      fsa --help for more
+# The container has no network and only sees the current folder (mounted at /work),
+# so config, STEP and output paths must be relative and inside it.
+set -e
+SELF=$(readlink -f "$0" 2>/dev/null || echo "$0")
+ROOT=$(cd "$(dirname "$SELF")/.." && pwd)
+IMAGE=finite-stress-analysis
+command -v docker >/dev/null 2>&1 || { echo "fsa: Docker is required (https://docs.docker.com/get-docker/)" >&2; exit 1; }
+docker info >/dev/null 2>&1 || { echo "fsa: Docker is installed but not running" >&2; exit 1; }
+if [ "$PWD" = "$HOME" ] || [ "$PWD" = / ]; then
+  echo "fsa: run from the part's folder, not $PWD (it gets mounted into the container)" >&2
+  exit 1
+fi
+docker image inspect "$IMAGE" >/dev/null 2>&1 || echo "fsa: building solver image (first run takes a few minutes)..." >&2
+docker build -q -t "$IMAGE" "$ROOT" >/dev/null  # cached after the first build; picks up repo updates
+status=0
+docker run --rm --network none --user "$(id -u):$(id -g)" \
+  -e OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}" -v "$PWD":/work "$IMAGE" "$@" || status=$?
+if [ "$status" -eq 137 ]; then
+  echo "fsa: the solver was killed, probably out of memory. Use a coarser mesh.fine/mesh.size," >&2
+  echo "     or give Docker more memory (Docker Desktop: Settings > Resources)." >&2
+fi
+exit "$status"

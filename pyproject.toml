@@ -8,8 +8,34 @@ dependencies = [
     # No linux-aarch64 wheel on PyPI: the Docker image gets gmsh from apt instead.
     "gmsh>=4.11; sys_platform != 'linux' or platform_machine != 'aarch64'",
     "numpy>=1.26",
+    "scipy>=1.11",
     "matplotlib>=3.8",
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.6"]
+dev = ["ruff>=0.6", "pytest>=8"]
+
+[project.scripts]
+fsa = "fsa.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "fsa"
+
+[tool.uv]
+# Only resolve packages at least 2 days old (supply-chain safety). Bump when re-locking.
+exclude-newer = "2026-11-13T00:00:00Z"
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["examples"]  # Fusion 360 scripts run inside Fusion, not here
+
+[tool.ruff.lint]
+extend-ignore = ["C408", "FURB122"]  # dict(k=v) and write-in-a-loop read fine here
+
+[tool.pytest.ini_options]
+markers = ["slow: runs the real solver in Docker"]
+addopts = "-m 'not slow'"

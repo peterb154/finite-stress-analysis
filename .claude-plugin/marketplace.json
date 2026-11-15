@@ -1,0 +1,12 @@
+{
+  "name": "finite-stress-analysis",
+  "owner": { "name": "peterb154" },
+  "description": "FEA stress checks for 3D-printed parts.",
+  "plugins": [
+    {
+      "name": "finite-stress-analysis",
+      "source": "./",
+      "description": "Stress-check 3D-printed parts (gmsh + CalculiX FEA in Docker)."
+    }
+  ]
+}

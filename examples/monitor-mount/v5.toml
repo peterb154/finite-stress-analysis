@@ -1,0 +1,88 @@
+# HP 32s monitor -> VESA 100 wall-arm adapter, v5 (the original design: cracked twice at the plate junction).
+# Frame: x = depth (0 = face against the monitor), y = width, z = up. mm, N, MPa.
+step = "v5.step"
+
+[material]
+preset = "PETG"
+
+[mesh]
+size = 5.0
+fine = 1.5
+refine = [[-1, -1, -90, 14, 130, 100]]   # plate/backing: where v5 broke
+
+# The arm holds the part by its four VESA heat-set inserts (spider is x = 48..58).
+[[fixed]]
+name = "vesa_inserts"
+[[fixed.cylinders]]
+points = [[0, 11.85, -26.15], [0, 11.85, 73.85], [0, 111.85, -26.15], [0, 111.85, 73.85]]
+axis = [1, 0, 0]
+r = 2.8
+span = [40, 1e9]
+
+# The monitor is far stiffer than the print: a rigid body on the four M4 screw seats.
+# ref is a point inside the monitor; loads with no `at` act there.
+[[load_path]]
+name = "monitor"
+ref = [-40, 61.85, 23.85]
+[[load_path.cylinders]]
+points = [[0, 8.55, 42.95], [0, 115.15, 6.95], [0, 115.15, 42.95], [0, 8.55, 6.95]]
+axis = [1, 0, 0]
+r = 3.6
+span = [0.3, 1e9]
+
+[[case]]
+name = "weight"
+loads = [{ path = "monitor", force = [0, 0, -49.05] }]
+
+[[case]]
+name = "push_down_100N"   # hand on the front edge
+loads = [{ path = "monitor", force = [0, 0, -49.05] },
+         { path = "monitor", force = [0, 0, -100], at = [-60, 61.85, 23.85] }]
+
+[[case]]
+name = "lift_up_100N"
+loads = [{ path = "monitor", force = [0, 0, -49.05] },
+         { path = "monitor", force = [0, 0, 100], at = [-60, 61.85, 23.85] }]
+
+[[case]]
+name = "tilt_push_40N_top"   # push the top edge toward the wall
+loads = [{ path = "monitor", force = [0, 0, -49.05] },
+         { path = "monitor", force = [40, 0, 0], at = [-40, 61.85, 273.85] }]
+
+[[case]]
+name = "tilt_pull_40N_top"   # pull the top edge toward you: what broke v5
+loads = [{ path = "monitor", force = [0, 0, -49.05] },
+         { path = "monitor", force = [-40, 0, 0], at = [-40, 61.85, 273.85] }]
+
+[[case]]
+name = "twist_40N_side"   # push a side edge toward the wall
+loads = [{ path = "monitor", force = [0, 0, -49.05] },
+         { path = "monitor", force = [40, 0, 0], at = [-40, 411.85, 23.85] }]
+
+# Layer-stacking direction for each way the part could be printed.
+[print]
+flat = [1, 0, 0]       # plate/spider on the bed
+standing = [0, 0, 1]   # as installed
+side = [0, 1, 0]
+
+[[zone]]
+name = "plate_junction"
+box = [-1, -1, -200, 10, 200, 200]
+
+# v5's CAD has printed M4 threads in the spider: bore them out to heat-set insert holes.
+[[cut]]
+start = [40, 11.85, -26.15]
+vector = [25, 0, 0]
+r = 2.8
+[[cut]]
+start = [40, 11.85, 73.85]
+vector = [25, 0, 0]
+r = 2.8
+[[cut]]
+start = [40, 111.85, -26.15]
+vector = [25, 0, 0]
+r = 2.8
+[[cut]]
+start = [40, 111.85, 73.85]
+vector = [25, 0, 0]
+r = 2.8
