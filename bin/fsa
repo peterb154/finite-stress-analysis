@@ -1,0 +1,14 @@
+#!/bin/sh
+# fsa: stress-check a 3D-printed part. Runs the solver in Docker on the current folder.
+#   fsa run part.toml [--coarse]      fsa --help for more
+# The container has no network and only sees the current folder (mounted at /work),
+# so config, STEP and output paths must be relative and inside it.
+set -e
+SELF=$(readlink -f "$0" 2>/dev/null || echo "$0")
+ROOT=$(cd "$(dirname "$SELF")/.." && pwd)
+command -v docker >/dev/null 2>&1 || { echo "fsa: Docker is required (https://docs.docker.com/get-docker/)" >&2; exit 1; }
+docker info >/dev/null 2>&1 || { echo "fsa: Docker is installed but not running" >&2; exit 1; }
+echo "fsa: building solver image (first run takes a few minutes)..." >&2
+docker build -q -t finite-stress-analysis "$ROOT" >/dev/null
+exec docker run --rm --network none --user "$(id -u):$(id -g)" \
+  -e OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}" -v "$PWD":/work finite-stress-analysis "$@"
