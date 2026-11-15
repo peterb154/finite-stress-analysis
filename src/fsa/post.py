@@ -3,6 +3,7 @@
 import re
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 BC_EXCLUDE_MM = 1.5  # supports/rigid patches cause artificial peaks: ignore nodes this close
 
@@ -21,16 +22,15 @@ def normal_stress(s, n):
 
 def near_bc(xyz, bc_points):
     """Nodes within BC_EXCLUDE_MM of any support/load-patch node (exact, no sampling)."""
-    out = np.zeros(len(xyz), bool)
-    lo, hi = bc_points.min(0) - BC_EXCLUDE_MM, bc_points.max(0) + BC_EXCLUDE_MM
-    cand = np.flatnonzero(((xyz >= lo) & (xyz <= hi)).all(1))
-    for q in bc_points:
-        d = np.linalg.norm(xyz[cand] - q, axis=1)
-        out[cand[d < BC_EXCLUDE_MM]] = True
-    return out
+    hits = cKDTree(bc_points).query_ball_point(xyz, BC_EXCLUDE_MM, return_length=True)
+    return hits > 0
 
 
 def peak(val, xyz, ok):
+    if not ok.any():
+        raise ValueError(
+            f"every node is within {BC_EXCLUDE_MM} mm of a support or load patch: the selectors cover too much"
+        )
     i = np.flatnonzero(ok)[val[ok].argmax()]
     return float(val[i]), xyz[i].round(1).tolist()
 
