@@ -2,21 +2,28 @@
 
 ## Layout
 
-- `fea.py`: mesh (gmsh) → write CalculiX `.inp` → run `ccx` → read `.frd` → `summary.json`, `results.vtu`, PNGs.
-- `render.py`: zoomed multi-view heat maps from a run's `results.vtu`.
-- `fea.sh`: builds the Docker image and runs a command in it (`--network none`, repo mounted at `/work`).
-- `cad/`: example inputs (monitor mount v5 = failed design, v8c = fixed design). Keep them as regression checks.
-- `examples/monitor-mount/`: the Fusion 360 build script for v8c.
+- `src/fsa/`: the package. `config.py` (part.toml → dict, material presets, surface selectors),
+  `mesh.py` (gmsh), `solve.py` (CalculiX deck, run, read .frd), `post.py` (stress measures, .vtu I/O),
+  `render.py` (heat maps), `cli.py` (`fsa run|render|compare`).
+- `bin/fsa`: host wrapper. Builds the Docker image from this repo and runs `fsa` in it on `$PWD`
+  (`--network none`). The plugin puts `bin/` on Claude's PATH.
+- `skills/finite-stress-analysis/`: the Claude Code skill (`SKILL.md`) + config reference (`part-toml.md`).
+- `.claude-plugin/`: plugin + marketplace manifests (the repo is its own marketplace).
+- `examples/monitor-mount/`: v5 (failed design) and v8c (fixed design). The regression check.
+- `legacy/`: the original monitor-specific scripts, kept until the new CLI is confirmed. Not maintained.
 
 ## Units and frame
 
-mm, N, MPa. Example parts use x = depth, y = width, z = up.
+mm, N, MPa, in the STEP file's own frame.
 
 ## Rules
 
-- Python deps: uv only. Edit `pyproject.toml`, then `uv lock --exclude-newer <2 days ago>`. gmsh's Python module comes from apt inside Docker (no linux-aarch64 wheel on PyPI).
-- Always run CalculiX with `CCX_NPROC_EQUATION_SOLVER=1`. Multithreaded spooles gives wrong answers.
-- Run a coarse mesh first (`fea.py <name> 6 4`, about 10 s) before a fine one (`5 1.5`, minutes).
-- Sanity check after changing solver code: `v5` tilt-pull peak should stay around 54 MPa and `v8c` push-down around 12.5 MPa (fine mesh).
-- Peak stresses next to boundary conditions and sharp corners are partly artefacts. Look at the heat map, not just the number.
-- `runs/` is gitignored (large). Copy any image worth keeping into `docs/`.
+- Python deps: uv only. Edit `pyproject.toml`, bump `[tool.uv] exclude-newer` (2 days back), `uv lock`.
+  gmsh's Python module comes from apt inside Docker (no linux-aarch64 wheel on PyPI).
+- CalculiX must stay single-threaded (`solve.run_ccx` forces it). Multithreaded spooles gave wrong answers.
+- After changing solver code: `uv run pytest -m slow`, and a fine run of both examples should stay close to
+  examples/monitor-mount/README.md (v5 tilt-pull ~54 MPa, v8c push-down ~12.5 MPa).
+- Peak stresses next to supports, load patches and sharp corners are partly artefacts. fsa excludes nodes
+  within 1.5 mm of supports and load patches. Look at the heat map, not just the number.
+- Bump `version` in `.claude-plugin/plugin.json` when the plugin changes, or installed users won't get updates.
+- `runs/` is gitignored. Copy any image worth keeping into `docs/`.
