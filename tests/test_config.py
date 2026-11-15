@@ -84,3 +84,12 @@ def test_near_bc_is_exact():
     xyz = np.array([[0, 0, 0], [1.4, 0, 0], [1.6, 0, 0], [10, 0, 0], [10, 1.2, 0]], float)
     bc = np.array([[0, 0, 0], [10, 0, 0]], float)
     assert post.near_bc(xyz, bc).tolist() == [True, True, False, True, True]
+
+
+def test_config_errors_name_the_valid_choices(tmp_path):
+    with pytest.raises(ValueError, match="PETG"):
+        config.material({"preset": "NYLON"})
+    with pytest.raises(ValueError, match="point"):
+        config.selector({"name": "x", "cylinders": [{"axis": [0, 0, 1], "r": 1}]})
+    with pytest.raises(ValueError, match="hook"):
+        config.load(write(tmp_path, MINIMAL.replace('path = "hook"', 'path = "hoook"')))
