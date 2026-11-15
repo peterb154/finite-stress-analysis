@@ -68,3 +68,7 @@ Python deps are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` 
 image installs them with `uv sync --frozen`. CalculiX comes from Debian. A devcontainer is included
 (with Docker-in-Docker so `fea.sh` works inside it).
 See [CLAUDE.md](CLAUDE.md) for how the code is laid out.
+
+## License
+
+[MIT](LICENSE)
