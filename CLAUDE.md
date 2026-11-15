@@ -10,7 +10,6 @@
 - `skills/finite-stress-analysis/`: the Claude Code skill (`SKILL.md`) + config reference (`part-toml.md`).
 - `.claude-plugin/`: plugin + marketplace manifests (the repo is its own marketplace).
 - `examples/monitor-mount/`: v5 (failed design) and v8c (fixed design). The regression check.
-- `legacy/`: the original monitor-specific scripts, kept until the new CLI is confirmed. Not maintained.
 
 ## Units and frame
 
