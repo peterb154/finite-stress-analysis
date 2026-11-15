@@ -1,6 +1,6 @@
 # FEA toolchain: CalculiX (solver) from Debian, Python deps + the fsa package via uv.
 FROM debian:bookworm-slim
-COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.32@sha256:df4cae8f3a96d175e2e5f992e597550000edbe78fdc2594d5cd8de1a217f504c /uv /usr/local/bin/uv
 # python3-gmsh: PyPI has no linux-aarch64 gmsh wheel, so the venv sees Debian's via system site-packages.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       calculix-ccx python3 python3-gmsh \
