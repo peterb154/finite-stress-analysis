@@ -76,3 +76,11 @@ def test_select_cylinder_with_span_and_box():
     )
     xyz = np.array([[3, 0, 2], [3, 0, 2.2], [0.5, 0, 1], [6, 0, 0], [10.5, 0, 0]], float)
     assert config.select(sel, np.arange(5), xyz).tolist() == [0, 4]
+
+
+def test_near_bc_is_exact():
+    from fsa import post
+
+    xyz = np.array([[0, 0, 0], [1.4, 0, 0], [1.6, 0, 0], [10, 0, 0], [10, 1.2, 0]], float)
+    bc = np.array([[0, 0, 0], [10, 0, 0]], float)
+    assert post.near_bc(xyz, bc).tolist() == [True, True, False, True, True]

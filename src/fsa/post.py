@@ -20,9 +20,13 @@ def normal_stress(s, n):
 
 
 def near_bc(xyz, bc_points):
+    """Nodes within BC_EXCLUDE_MM of any support/load-patch node (exact, no sampling)."""
     out = np.zeros(len(xyz), bool)
-    for q in bc_points[:: max(1, len(bc_points) // 400)]:
-        out |= np.linalg.norm(xyz - q, axis=1) < BC_EXCLUDE_MM
+    lo, hi = bc_points.min(0) - BC_EXCLUDE_MM, bc_points.max(0) + BC_EXCLUDE_MM
+    cand = np.flatnonzero(((xyz >= lo) & (xyz <= hi)).all(1))
+    for q in bc_points:
+        d = np.linalg.norm(xyz[cand] - q, axis=1)
+        out[cand[d < BC_EXCLUDE_MM]] = True
     return out
 
 
