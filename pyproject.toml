@@ -30,6 +30,7 @@ exclude-newer = "2026-11-13T00:00:00Z"
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["examples"]  # Fusion 360 scripts run inside Fusion, not here
 
 [tool.ruff.lint]
 extend-ignore = ["C408", "FURB122"]  # dict(k=v) and write-in-a-loop read fine here
