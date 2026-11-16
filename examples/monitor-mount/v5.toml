@@ -1,6 +1,6 @@
 # HP 32s monitor -> VESA 100 wall-arm adapter, v5 (the original design: cracked twice at the plate junction).
 # Frame: x = depth (0 = face against the monitor), y = width, z = up. mm, N, MPa.
-step = "v5.step"
+geometry = "v5.step"
 
 [material]
 preset = "PETG"

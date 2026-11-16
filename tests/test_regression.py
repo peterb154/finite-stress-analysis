@@ -29,3 +29,24 @@ def test_v5_is_much_weaker_than_v8c(tmp_path):
     assert v5["vm_max"] > 30
     assert v8c["vm_max"] < 20
     assert v5["max_disp_mm"] > 3 * v8c["max_disp_mm"]
+
+
+@pytest.mark.slow
+def test_stl_matches_step(tmp_path, write_stl):
+    """v8c exported to STL should land close to the STEP result."""
+    (tmp_path / "step").mkdir()
+    (tmp_path / "stl").mkdir()
+    step = fsa_run(tmp_path / "step", "v8c")
+
+    d = tmp_path / "stl"
+    write_stl(d / "v8c.stl", EX / "v8c.step")
+    toml = (EX / "v8c.toml").read_text().replace('geometry = "v8c.step"', 'geometry = "v8c.stl"')
+    (d / "v8c.toml").write_text(toml)
+    case = "tilt_pull_40N_top"
+    subprocess.run([ROOT / "bin" / "fsa", "run", "v8c.toml", "--coarse", "--cases", case], cwd=d, check=True)
+    stl = json.loads((d / "runs" / "v8c" / "summary.json").read_text())["cases"][case]
+    # Deflection is a whole-part number and agrees closely. The coarse peak sits at a sharp corner and moves
+    # with the mesh: the STEP peak alone is 16.4 MPa on macOS and 15.0 on Linux CI (different gmsh builds),
+    # and STL gave 16.3 and 11.4. So the peak is only a sanity bound (catches wrong supports or units).
+    assert stl["max_disp_mm"] == pytest.approx(step["max_disp_mm"], rel=0.10)
+    assert stl["vm_max"] == pytest.approx(step["vm_max"], rel=0.30)

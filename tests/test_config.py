@@ -37,7 +37,7 @@ def test_examples_load():
     for f in ("v5.toml", "v8c.toml"):
         cfg = config.load(EX / f)
         assert len(cfg["cases"]) == 6
-        assert cfg["step"].exists()
+        assert cfg["geometry"].exists()
         assert cfg["material"]["E"] == 2000.0
 
 
@@ -93,3 +93,26 @@ def test_config_errors_name_the_valid_choices(tmp_path):
         config.selector({"name": "x", "cylinders": [{"axis": [0, 0, 1], "r": 1}]})
     with pytest.raises(ValueError, match="hook"):
         config.load(write(tmp_path, MINIMAL.replace('path = "hook"', 'path = "hoook"')))
+
+
+def test_geometry_key_and_step_alias(tmp_path):
+    p = tmp_path / "part.toml"
+    p.write_text('geometry = "x.STL"\n' + MINIMAL)
+    assert config.load(p)["geometry"] == tmp_path / "x.STL"
+    assert config.load(write(tmp_path, MINIMAL))["geometry"] == tmp_path / "x.step"  # old `step` key
+
+
+def test_geometry_errors(tmp_path):
+    p = tmp_path / "part.toml"
+    p.write_text(MINIMAL)
+    with pytest.raises(ValueError, match="geometry"):
+        config.load(p)
+    p.write_text('geometry = "x.stl"\nstep = "x.step"\n' + MINIMAL)
+    with pytest.raises(ValueError, match="not both"):
+        config.load(p)
+    p.write_text('geometry = "x.obj"\n' + MINIMAL)
+    with pytest.raises(ValueError, match=".stl"):
+        config.load(p)
+    p.write_text('geometry = "x.stl"\n' + MINIMAL + "[[cut]]\nstart = [0, 0, 0]\nvector = [1, 0, 0]\nr = 1\n")
+    with pytest.raises(ValueError, match="STEP"):
+        config.load(p)
