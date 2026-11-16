@@ -45,6 +45,8 @@ def load(path):
 
 def geometry_file(raw, path):
     """`geometry` is the key; `step` is the older name and still works."""
+    if "geometry" in raw and "step" in raw:
+        raise ValueError(f"{path}: give geometry or step, not both (step is the old name for geometry)")
     name = raw.get("geometry", raw.get("step"))
     if name is None:
         raise ValueError(f'{path}: needs geometry = "part.step" (or .stl)')

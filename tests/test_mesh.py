@@ -6,31 +6,16 @@ import pytest
 from fsa import cli, config
 from fsa.mesh import mesh
 
-gmsh = pytest.importorskip("gmsh")
+pytest.importorskip("gmsh")
 
 MESH = {"size": 4.0, "fine": 4.0, "straight_tets": True, "refine": []}
-
-
-def write_stl(path, build):
-    """Build an OCC solid, 3D-mesh it, and save its boundary as STL (a valid 3D mesh = a watertight skin)."""
-    gmsh.initialize()
-    try:
-        gmsh.option.setNumber("General.Terminal", 0)
-        build(gmsh.model.occ)
-        gmsh.model.occ.synchronize()
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 2)
-        gmsh.model.mesh.generate(3)
-        gmsh.model.addPhysicalGroup(2, [s for _, s in gmsh.model.getEntities(2)])
-        gmsh.write(str(path))
-    finally:
-        gmsh.finalize()
 
 
 def cube_with_hole(occ):
     occ.cut([(3, occ.addBox(0, 0, 0, 20, 20, 20))], [(3, occ.addCylinder(10, 10, -1, 0, 0, 22, 4))])
 
 
-def test_stl_meshes_and_selectors_pick_nodes(tmp_path):
+def test_stl_meshes_and_selectors_pick_nodes(tmp_path, write_stl):
     stl = tmp_path / "cube.stl"
     write_stl(stl, cube_with_hole)
     ids, xyz, tets, tris = mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)

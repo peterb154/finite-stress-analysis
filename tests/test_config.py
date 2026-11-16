@@ -107,6 +107,9 @@ def test_geometry_errors(tmp_path):
     p.write_text(MINIMAL)
     with pytest.raises(ValueError, match="geometry"):
         config.load(p)
+    p.write_text('geometry = "x.stl"\nstep = "x.step"\n' + MINIMAL)
+    with pytest.raises(ValueError, match="not both"):
+        config.load(p)
     p.write_text('geometry = "x.obj"\n' + MINIMAL)
     with pytest.raises(ValueError, match=".stl"):
         config.load(p)

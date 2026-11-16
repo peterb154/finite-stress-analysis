@@ -11,6 +11,10 @@ STL_HELP = (
 )
 
 
+class EmptyMesh(Exception):
+    """gmsh finished without error but made no tets (an open STL does this)."""
+
+
 def mesh(cfg, size, fine):
     import gmsh
 
@@ -64,11 +68,6 @@ def mesh_stl(gmsh, path, m, size, fine):
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.merge(str(path))
-        if angle is None:
-            print(
-                f"{path.name}: couldn't remesh the surface, so the mesh follows the STL's own triangles "
-                "(mesh.size/fine only apply inside). If the run is slow or killed, export a coarser STL or use STEP."
-            )
         try:
             if angle is not None:
                 gmsh.model.mesh.classifySurfaces(angle * math.pi / 180, True, True, math.pi)
@@ -79,9 +78,17 @@ def mesh_stl(gmsh, path, m, size, fine):
             if not errors:
                 print_bounding_box(gmsh, path)
             generate(gmsh, m, size, fine, from_curvature=0)  # facets look curved everywhere
-            return
-        except Exception as e:  # noqa: BLE001 - gmsh raises plain Exception
+        except Exception as e:
+            if type(e) not in (Exception, EmptyMesh):  # gmsh raises plain Exception; anything else is a bug
+                raise
             errors.append(f"{angle or 'raw'}: {e}")
+            continue
+        if angle is None:
+            print(
+                f"{path.name}: couldn't remesh the surface, so the mesh follows the STL's own triangles "
+                "(mesh.size/fine only apply inside). If the run is slow or killed, export a coarser STL or use STEP."
+            )
+        return
     raise ValueError(f"{path.name}: {STL_HELP}. gmsh said: {'; '.join(errors)}")
 
 
@@ -109,7 +116,7 @@ def generate(gmsh, m, size, fine, from_curvature=12):
     gmsh.option.setNumber("Mesh.SecondOrderLinear", int(bool(m["straight_tets"])))
     gmsh.model.mesh.generate(3)
     if len(gmsh.model.mesh.getElements(3)[0]) == 0:  # an open STL "meshes" fine, with no volume elements
-        raise ValueError("no volume elements: the surface is not closed")
+        raise EmptyMesh("no volume elements: the surface is not closed")
 
 
 def print_bounding_box(gmsh, path):

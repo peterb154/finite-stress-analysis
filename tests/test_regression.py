@@ -32,25 +32,14 @@ def test_v5_is_much_weaker_than_v8c(tmp_path):
 
 
 @pytest.mark.slow
-def test_stl_matches_step(tmp_path):
+def test_stl_matches_step(tmp_path, write_stl):
     """v8c exported to STL should land close to the STEP result."""
-    gmsh = pytest.importorskip("gmsh")
     (tmp_path / "step").mkdir()
     (tmp_path / "stl").mkdir()
     step = fsa_run(tmp_path / "step", "v8c")
 
     d = tmp_path / "stl"
-    gmsh.initialize()
-    try:
-        gmsh.option.setNumber("General.Terminal", 0)
-        gmsh.model.occ.importShapes(str(EX / "v8c.step"))
-        gmsh.model.occ.synchronize()
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 2)
-        gmsh.model.mesh.generate(3)  # a valid 3D mesh = a watertight skin to export
-        gmsh.model.addPhysicalGroup(2, [s for _, s in gmsh.model.getEntities(2)])
-        gmsh.write(str(d / "v8c.stl"))
-    finally:
-        gmsh.finalize()
+    write_stl(d / "v8c.stl", EX / "v8c.step")
     toml = (EX / "v8c.toml").read_text().replace('geometry = "v8c.step"', 'geometry = "v8c.stl"')
     (d / "v8c.toml").write_text(toml)
     case = "tilt_pull_40N_top"
