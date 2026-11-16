@@ -15,6 +15,7 @@ MATERIALS = {
 }
 DEFAULT_PRINT = {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}
 BIG = 1e9
+GEOMETRY_TYPES = (".step", ".stp", ".stl")
 
 
 def load(path):
@@ -23,7 +24,7 @@ def load(path):
     cfg = {
         "name": raw.get("name", path.stem),
         "dir": path.parent,
-        "step": path.parent / raw["step"],
+        "geometry": path.parent / geometry_file(raw, path),
         "material": material(raw.get("material", {})),
         "mesh": {"size": 5.0, "fine": 1.5, "straight_tets": True, "refine": [], **raw.get("mesh", {})},
         "cuts": raw.get("cut", []),
@@ -32,12 +33,24 @@ def load(path):
         "print": {k: unit(v) for k, v in raw.get("print", DEFAULT_PRINT).items()},
         "zones": raw.get("zone", []),
     }
+    if cfg["cuts"] and cfg["geometry"].suffix.lower() == ".stl":
+        raise ValueError(f"{path}: [[cut]] needs a STEP file; cut the holes in CAD, or export STEP instead of STL")
     if not cfg["fixed"]:
         raise ValueError(f"{path}: needs at least one [[fixed]] support")
     cfg["cases"] = {c["name"]: case_loads(c, cfg["paths"]) for c in raw.get("case", [])}
     if not cfg["cases"]:
         raise ValueError(f"{path}: needs at least one [[case]]")
     return cfg
+
+
+def geometry_file(raw, path):
+    """`geometry` is the key; `step` is the older name and still works."""
+    name = raw.get("geometry", raw.get("step"))
+    if name is None:
+        raise ValueError(f'{path}: needs geometry = "part.step" (or .stl)')
+    if Path(name).suffix.lower() not in GEOMETRY_TYPES:
+        raise ValueError(f"{path}: geometry {name!r} must be one of {', '.join(GEOMETRY_TYPES)}")
+    return name
 
 
 def material(m):

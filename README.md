@@ -3,7 +3,7 @@
 Quick, local stress analysis (FEA) for 3D-printed parts, built to be driven by
 [Claude Code](https://claude.com/claude-code).
 
-STEP file + a short `part.toml` in → stress heat maps and a pass/fail summary out. It answers
+STEP (or STL) file + a short `part.toml` in → stress heat maps and a pass/fail summary out. It answers
 "will this printed bracket break, and where?" before you spend five hours printing it.
 
 ![v5 vs v8c](docs/compare.png)
@@ -22,7 +22,7 @@ Needs [Docker](https://docs.docker.com/get-docker/) running. In any Claude Code 
 ```
 
 Then ask things like *"will this bracket hold a 5 kg shelf?"* or *"compare v1 and v2 of my mount"*.
-The skill walks Claude through it: get a STEP file, ask you how the part is held and loaded, write `part.toml`,
+The skill walks Claude through it: get a STEP or STL file, ask you how the part is held and loaded, write `part.toml`,
 run coarse then fine, and show you the heat maps. The plugin puts `fsa` on Claude's PATH.
 
 ## Use it directly
@@ -42,7 +42,8 @@ Each run writes `runs/<name>/` with `summary.json`, heat-map PNGs and `results.v
 
 ## How it works
 
-1. **[gmsh](https://gmsh.info/)** meshes the STEP into second-order tetrahedra, finer inside `refine` boxes.
+1. **[gmsh](https://gmsh.info/)** meshes the part into second-order tetrahedra, finer inside `refine` boxes.
+   An STL's surfaces are rebuilt from its triangles and remeshed first.
 2. **[CalculiX](http://www.calculix.de/)** solves linear static stress for each load case. Supports are fixed
    surfaces. Loads come in through rigid bodies (a monitor, a shelf, a bolt) on the surfaces you pick.
 3. fsa reports peak von Mises stress, deflection and **layer tension**: the stress pulling print layers apart,
@@ -55,6 +56,7 @@ Everything runs in Docker with `--network none`, seeing only the current folder.
 
 - The material is isotropic with rough FDM strengths (PETG, PLA, ASA, ABS, PA-CF presets). Layer weakness
   is checked after solving, not modelled.
+- STL input must be watertight and is read as mm. STEP gives cleaner results at holes and fillets.
 - Linear static only: no creep, impact, snap-fits or large deflections.
 - Not calibrated against physical break tests. Trust comparisons between designs more than absolute
   numbers, and keep a 2× or larger margin.
@@ -64,7 +66,7 @@ Everything runs in Docker with `--network none`, seeing only the current folder.
 ```sh
 uv sync                 # Python deps (pyproject.toml + uv.lock)
 uv run pytest           # fast tests
-uv run pytest -m slow   # real solver runs in Docker (~1 min)
+uv run pytest -m slow   # real solver runs in Docker (~2 min)
 uv run ruff check . && uv run ruff format --check .
 claude plugin validate ./
 ```

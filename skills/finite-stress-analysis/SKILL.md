@@ -7,7 +7,7 @@ allowed-tools: Bash(fsa *)
 
 # Finite stress analysis with `fsa`
 
-`fsa` meshes a STEP file, solves linear-static stress for each load case, and reports peak stress, deflection
+`fsa` meshes a STEP or STL file, solves linear-static stress for each load case, and reports peak stress, deflection
 and **layer tension**: stress pulling print layers apart, for each print orientation. Layer adhesion is usually
 what breaks FDM parts. Everything runs in Docker with no network, on the current folder only.
 
@@ -16,12 +16,13 @@ It needs Docker running. The first run builds the image (a few minutes).
 
 ## Workflow
 
-1. **Get a STEP file** (mm). From Fusion 360 via its MCP server, or ask the user to export one.
-   Put it in a project folder; run `fsa` from that folder (paths must be relative and inside it).
+1. **Get the geometry** (mm). Prefer STEP: from Fusion 360 via its MCP server, or ask the user to export one.
+   STL works too (downloaded models, slicer exports; see Gotchas). Put it in a project folder and run `fsa`
+   from that folder (paths must be relative and inside it).
 2. **Learn the geometry before writing the config.** Ask the user how the part is held and loaded:
    what bolts it down, what it carries, how heavy, and what a person might do to it (push, pull, lean).
    Get coordinates of holes and faces from the CAD (bounding box, hole centres), not by guessing.
-3. **Write `part.toml`** next to the STEP. Format: [part-toml.md](part-toml.md). Worked example:
+3. **Write `part.toml`** next to the geometry file. Format: [part-toml.md](part-toml.md). Worked example:
    `${CLAUDE_PLUGIN_ROOT}/examples/monitor-mount/v8c.toml`.
 4. **Coarse run first:** `fsa run part.toml --coarse` (~10-30 s). Check the printed node counts: every
    `fixed` and `load_path` must select nodes (fsa stops if one selects none). Typical: hundreds per support.
@@ -53,7 +54,12 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
   or shrink the `refine` boxes.
 - A rigid `load_path` makes whatever it touches infinitely stiff. Fine for a monitor or a steel bracket; for
   a soft neighbour, expect it to over-stiffen the part locally.
-- STEP units: fsa converts to mm. Check the coarse run's peak location is inside the part's bounding box.
-- The STEP must be one solid body inside the folder you run from. Union multi-body parts in CAD first.
+- Units: fsa converts STEP to mm. STL has no units and is read as mm. fsa prints the bounding box at the
+  start of every run: check it against the part's real size (an inch file looks 25x too small).
+- The geometry must be one solid body inside the folder you run from. Union multi-body parts in CAD first.
+- STL limits: it must be watertight and not intersect itself. Downloaded models often aren't. fsa then stops
+  and says to repair it (slicer repair, MeshLab, Meshmixer) or export STEP. `[[cut]]` needs STEP. Holes are
+  faceted, so stresses at holes and fillets are a bit noisier than from STEP (the peak von Mises on the
+  example lands within a few %). Selectors still work: they pick nodes by position, not CAD faces.
 - A node can't be both fixed and in a load path (or in two load paths). fsa stops and names the pair;
   shrink a cylinder's `r`/`span` or a box.

@@ -1,10 +1,10 @@
 # part.toml reference
 
-Units: mm, N, MPa. Coordinates are the STEP file's own frame. Paths are relative to the toml file.
+Units: mm, N, MPa. Coordinates are the geometry file's own frame. Paths are relative to the toml file.
 
 ```toml
 name = "bracket_v2"       # optional; default = file name. Output goes to runs/<name>/
-step = "bracket_v2.step"
+geometry = "bracket_v2.step"   # .step/.stp, or .stl (assumed mm). The older key `step` still works.
 
 [material]
 preset = "PETG"           # PETG | PLA | ASA | ABS | PA-CF
@@ -55,7 +55,7 @@ on_side = [1, 0, 0]
 name = "neck"
 box = [x0, y0, z0, x1, y1, z1]
 
-# Optional: cylinders cut out of the CAD before meshing (e.g. printed threads -> insert holes).
+# Optional: cylinders cut out of the CAD before meshing (e.g. printed threads -> insert holes). STEP only.
 [[cut]]
 start = [40, 11.85, -26.15]
 vector = [25, 0, 0]

@@ -1,6 +1,6 @@
 # HP 32s monitor -> VESA 100 wall-arm adapter, v8c (the fixed design).
 # Frame: x = depth (0 = face against the monitor), y = width, z = up. mm, N, MPa.
-step = "v8c.step"
+geometry = "v8c.step"
 
 [material]
 preset = "PETG"
