@@ -61,9 +61,9 @@ def test_loads_in_one_case_add_up(tmp_path):
 
 def test_material_override_and_errors(tmp_path):
     assert config.material({"preset": "PETG", "E": 1500})["E"] == 1500.0
-    with pytest.raises(ValueError, match="preset"):
+    with pytest.raises(config.UserError, match="preset"):
         config.material({"E": 1})
-    with pytest.raises(ValueError, match="fixed"):
+    with pytest.raises(config.UserError, match="fixed"):
         config.load(write(tmp_path, '[material]\npreset="PLA"\n[[case]]\nname="a"\nloads=[]\n'))
 
 
@@ -87,11 +87,11 @@ def test_near_bc_is_exact():
 
 
 def test_config_errors_name_the_valid_choices(tmp_path):
-    with pytest.raises(ValueError, match="PETG"):
+    with pytest.raises(config.UserError, match="PETG"):
         config.material({"preset": "NYLON"})
-    with pytest.raises(ValueError, match="point"):
+    with pytest.raises(config.UserError, match="point"):
         config.selector({"name": "x", "cylinders": [{"axis": [0, 0, 1], "r": 1}]})
-    with pytest.raises(ValueError, match="hook"):
+    with pytest.raises(config.UserError, match="hook"):
         config.load(write(tmp_path, MINIMAL.replace('path = "hook"', 'path = "hoook"')))
 
 
@@ -105,16 +105,16 @@ def test_geometry_key_and_step_alias(tmp_path):
 def test_geometry_errors(tmp_path):
     p = tmp_path / "part.toml"
     p.write_text(MINIMAL)
-    with pytest.raises(ValueError, match="geometry"):
+    with pytest.raises(config.UserError, match="geometry"):
         config.load(p)
     p.write_text('geometry = "x.stl"\nstep = "x.step"\n' + MINIMAL)
-    with pytest.raises(ValueError, match="not both"):
+    with pytest.raises(config.UserError, match="not both"):
         config.load(p)
     p.write_text('geometry = "x.obj"\n' + MINIMAL)
-    with pytest.raises(ValueError, match=".stl"):
+    with pytest.raises(config.UserError, match=".stl"):
         config.load(p)
     p.write_text('geometry = "x.stl"\n' + MINIMAL + "[[cut]]\nstart = [0, 0, 0]\nvector = [1, 0, 0]\nr = 1\n")
-    with pytest.raises(ValueError, match="STEP"):
+    with pytest.raises(config.UserError, match="STEP"):
         config.load(p)
 
 
@@ -126,12 +126,12 @@ def test_printed_and_warning_fields():
     assert config.material({"preset": "TPU-95A", "warning": ""})["warning"] == ""  # can be silenced
     steel = config.material({"E": 200000, "nu": 0.3, "inplane": 250, "printed": False})
     assert steel["interlayer"] == 250.0  # no layers, so not required
-    with pytest.raises(ValueError, match="interlayer"):
+    with pytest.raises(config.UserError, match="interlayer"):
         config.material({"E": 2000, "nu": 0.3, "inplane": 40})
 
 
 def test_material_rejects_typos_and_non_bool_printed():
-    with pytest.raises(ValueError, match="prnted"):
+    with pytest.raises(config.UserError, match="prnted"):
         config.material({"preset": "AL6061-T6", "prnted": False})
-    with pytest.raises(ValueError, match="true or false"):
+    with pytest.raises(config.UserError, match="true or false"):
         config.material({"preset": "PETG", "printed": "false"})  # bool("false") would be True

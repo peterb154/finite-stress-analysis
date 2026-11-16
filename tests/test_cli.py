@@ -9,9 +9,9 @@ CASES = {"weight": 1, "pull": 2, "twist": 3}
 def test_pick_cases():
     assert list(cli.pick_cases(CASES, None)) == ["weight", "pull", "twist"]
     assert list(cli.pick_cases(CASES, "3,weight")) == ["twist", "weight"]
-    with pytest.raises(SystemExit, match="out of range"):
+    with pytest.raises(config.UserError, match="out of range"):
         cli.pick_cases(CASES, "4")
-    with pytest.raises(SystemExit, match="unknown"):
+    with pytest.raises(config.UserError, match="unknown"):
         cli.pick_cases(CASES, "push")
 
 
@@ -27,9 +27,9 @@ def test_select_bcs_rejects_overlap_and_empty():
     sp = np.array([[0, 0, 0], [5, 0, 0], [9, 0, 0]], float)
     fixed, paths = cli.select_bcs(bcs([-1, -1, -1, 1, 1, 1], [8, -1, -1, 10, 1, 1]), surf, sp)
     assert fixed.tolist() == [10] and paths["hook"][0].tolist() == [12]
-    with pytest.raises(SystemExit, match="share 1"):
+    with pytest.raises(config.UserError, match="share 1"):
         cli.select_bcs(bcs([-1, -1, -1, 6, 1, 1], [4, -1, -1, 10, 1, 1]), surf, sp)
-    with pytest.raises(SystemExit, match="no surface nodes"):
+    with pytest.raises(config.UserError, match="no surface nodes"):
         cli.select_bcs(bcs([-1, -1, -1, 1, 1, 1], [20, -1, -1, 30, 1, 1]), surf, sp)
 
 
@@ -69,3 +69,20 @@ def test_tpu_warning_reaches_summary(capsys):
     assert "linear" in result["material"]["warning"]
     cli.print_table(result)
     assert "WARNING" in capsys.readouterr().out
+
+
+def test_bad_input_exits_with_message_not_traceback(tmp_path, capsys):
+    toml = tmp_path / "p.toml"
+    toml.write_text('geometry = "p.step"\n')  # no material, supports or cases
+    with pytest.raises(SystemExit) as e:
+        cli.main(["run", str(toml)])
+    assert str(e.value).startswith("fsa: material needs a preset")
+
+
+def test_bugs_still_raise(monkeypatch):
+    def boom(*_):
+        raise ValueError("a bug, not bad input")
+
+    monkeypatch.setattr(cli, "render_field", boom)
+    with pytest.raises(ValueError, match="a bug"):
+        cli.main(["render", "runs/x", "case"])

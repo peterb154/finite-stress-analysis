@@ -5,6 +5,11 @@ from pathlib import Path
 
 import numpy as np
 
+
+class UserError(ValueError):
+    """A problem with the user's part.toml or geometry. fsa prints just the message, no traceback."""
+
+
 # Rough FDM values (MPa). "inplane" = along layers, "interlayer" = pulling layers apart.
 # printed=False: a milled/cast part, so no layers; "inplane" is the yield strength.
 TPU_WARNING = (
@@ -43,38 +48,38 @@ def load(path):
         "zones": raw.get("zone", []),
     }
     if cfg["cuts"] and cfg["geometry"].suffix.lower() == ".stl":
-        raise ValueError(f"{path}: [[cut]] needs a STEP file; cut the holes in CAD, or export STEP instead of STL")
+        raise UserError(f"{path}: [[cut]] needs a STEP file; cut the holes in CAD, or export STEP instead of STL")
     if not cfg["fixed"]:
-        raise ValueError(f"{path}: needs at least one [[fixed]] support")
+        raise UserError(f"{path}: needs at least one [[fixed]] support")
     cfg["cases"] = {c["name"]: case_loads(c, cfg["paths"]) for c in raw.get("case", [])}
     if not cfg["cases"]:
-        raise ValueError(f"{path}: needs at least one [[case]]")
+        raise UserError(f"{path}: needs at least one [[case]]")
     return cfg
 
 
 def geometry_file(raw, path):
     """`geometry` is the key; `step` is the older name and still works."""
     if "geometry" in raw and "step" in raw:
-        raise ValueError(f"{path}: give geometry or step, not both (step is the old name for geometry)")
+        raise UserError(f"{path}: give geometry or step, not both (step is the old name for geometry)")
     name = raw.get("geometry", raw.get("step"))
     if name is None:
-        raise ValueError(f'{path}: needs geometry = "part.step" (or .stl)')
+        raise UserError(f'{path}: needs geometry = "part.step" (or .stl)')
     if Path(name).suffix.lower() not in GEOMETRY_TYPES:
-        raise ValueError(f"{path}: geometry {name!r} must be one of {', '.join(GEOMETRY_TYPES)}")
+        raise UserError(f"{path}: geometry {name!r} must be one of {', '.join(GEOMETRY_TYPES)}")
     return name
 
 
 def material(m):
     unknown = set(m) - MATERIAL_KEYS
     if unknown:
-        raise ValueError(f"unknown [material] key(s) {sorted(unknown)}; have {sorted(MATERIAL_KEYS)}")
+        raise UserError(f"unknown [material] key(s) {sorted(unknown)}; have {sorted(MATERIAL_KEYS)}")
     if "preset" in m and m["preset"] not in MATERIALS:
-        raise ValueError(f"unknown material preset {m['preset']!r}; have {', '.join(MATERIALS)}")
+        raise UserError(f"unknown material preset {m['preset']!r}; have {', '.join(MATERIALS)}")
     base = {"printed": True, **MATERIALS[m["preset"]]} if "preset" in m else {"printed": True}
     for k, v in m.items():
         if k == "printed":
             if not isinstance(v, bool):
-                raise ValueError(f"material.printed must be true or false, not {v!r}")
+                raise UserError(f"material.printed must be true or false, not {v!r}")
             base[k] = v
         elif k == "warning":
             base[k] = str(v)
@@ -84,7 +89,7 @@ def material(m):
         base.setdefault("interlayer", base["inplane"])  # no layers, so the across-layer limit is moot
     missing = {"E", "nu", "inplane", "interlayer"} - base.keys()
     if missing:
-        raise ValueError(f"material needs a preset ({', '.join(MATERIALS)}) or {sorted(missing)}")
+        raise UserError(f"material needs a preset ({', '.join(MATERIALS)}) or {sorted(missing)}")
     return base
 
 
@@ -93,7 +98,7 @@ def selector(s):
     cyls = []
     for c in s.get("cylinders", []):
         if "point" not in c and "points" not in c:
-            raise ValueError(f"'{s.get('name')}': each cylinder needs point = [x, y, z] or points = [[..], ..]")
+            raise UserError(f"'{s.get('name')}': each cylinder needs point = [x, y, z] or points = [[..], ..]")
         for p in c.get("points", [c.get("point")]):
             span = c.get("span", [-BIG, BIG])
             cyls.append(
@@ -101,7 +106,7 @@ def selector(s):
             )
     boxes = [np.array(b, float).reshape(2, 3) for b in s.get("boxes", [])]
     if not cyls and not boxes:
-        raise ValueError(f"'{s.get('name')}' selects nothing: give cylinders or boxes")
+        raise UserError(f"'{s.get('name')}' selects nothing: give cylinders or boxes")
     return {"name": s.get("name", ""), "cylinders": cyls, "boxes": boxes}
 
 
@@ -110,7 +115,7 @@ def case_loads(c, paths):
     out = {}
     for ld in c["loads"]:
         if ld["path"] not in paths:
-            raise ValueError(f"case '{c['name']}': unknown load path {ld['path']!r}; have {list(paths)}")
+            raise UserError(f"case '{c['name']}': unknown load path {ld['path']!r}; have {list(paths)}")
         p = paths[ld["path"]]
         f = vec(ld.get("force", [0, 0, 0]))
         at = vec(ld["at"]) if "at" in ld else p["ref"]

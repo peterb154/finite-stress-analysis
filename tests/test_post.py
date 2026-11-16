@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from fsa import post
+from fsa import config, post
 
 
 def test_vtu_round_trip(tmp_path):
@@ -26,5 +26,5 @@ def test_von_mises_uniaxial_and_layer_tension():
 def test_peak_skips_excluded_nodes_and_fails_when_all_excluded():
     xyz = np.eye(3)
     assert post.peak(np.array([9.0, 2, 1]), xyz, np.array([False, True, True])) == (2.0, [0.0, 1.0, 0.0])
-    with pytest.raises(ValueError, match="too much"):
+    with pytest.raises(config.UserError, match="too much"):
         post.peak(np.ones(3), xyz, np.zeros(3, bool))

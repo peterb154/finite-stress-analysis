@@ -5,6 +5,8 @@ import re
 import numpy as np
 from scipy.spatial import cKDTree
 
+from .config import UserError
+
 BC_EXCLUDE_MM = 1.5  # supports/rigid patches cause artificial peaks: ignore nodes this close
 
 
@@ -28,7 +30,7 @@ def near_bc(xyz, bc_points):
 
 def peak(val, xyz, ok):
     if not ok.any():
-        raise ValueError(
+        raise UserError(
             f"every node is within {BC_EXCLUDE_MM} mm of a support or load patch: the selectors cover too much"
         )
     i = np.flatnonzero(ok)[val[ok].argmax()]
