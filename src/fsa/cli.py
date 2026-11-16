@@ -119,13 +119,17 @@ def select_bcs(cfg, surf, sp):
     groups = {"fixed": fixed, **{n: v[0] for n, v in paths.items()}}
     for n, nodes in groups.items():
         if len(nodes) == 0:
-            sys.exit(f"'{n}' selected no surface nodes: check its cylinders/boxes against the STEP coordinates")
+            raise config.UserError(
+                f"'{n}' selected no surface nodes: check its cylinders/boxes against the STEP coordinates"
+            )
     names = list(groups)
     for i, a in enumerate(names):
         for b in names[i + 1 :]:
             both = np.intersect1d(groups[a], groups[b])
             if len(both):
-                sys.exit(f"'{a}' and '{b}' share {len(both)} surface nodes: a node can't be both. Shrink one.")
+                raise config.UserError(
+                    f"'{a}' and '{b}' share {len(both)} surface nodes: a node can't be both. Shrink one."
+                )
     return fixed, paths
 
 
@@ -136,11 +140,11 @@ def pick_cases(cases, sel):
     keep = []
     for s in sel.split(","):
         if s.isdigit() and not 1 <= int(s) <= len(names):
-            sys.exit(f"case number {s} out of range 1..{len(names)}")
+            raise config.UserError(f"case number {s} out of range 1..{len(names)}")
         keep.append(names[int(s) - 1] if s.isdigit() else s)
     unknown = [k for k in keep if k not in cases]
     if unknown:
-        sys.exit(f"unknown case(s) {unknown}; have {names}")
+        raise config.UserError(f"unknown case(s) {unknown}; have {names}")
     return {k: cases[k] for k in keep}
 
 
@@ -175,7 +179,7 @@ def render_field(d, case, field, vmax=None):
     s, xyz, tets, fields = load_run(d)
     key = f"{case}_{field}"
     if key not in fields:
-        sys.exit(f"no field {key}; have {sorted(k for k in fields if k.startswith(case))}")
+        raise config.UserError(f"no field {key}; have {sorted(k for k in fields if k.startswith(case))}")
     if vmax is None:
         vmax = s["material"]["inplane" if field == "vm" else "interlayer"]
     out = Path(d) / f"{key}.png"

@@ -43,7 +43,7 @@ def test_open_stl_says_how_to_fix_it(tmp_path):
         lines += ["endloop", "endfacet"]
     stl = tmp_path / "open.stl"
     stl.write_text("\n".join([*lines, "endsolid open"]) + "\n")
-    with pytest.raises(ValueError, match="watertight"):
+    with pytest.raises(config.UserError, match="watertight"):
         mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)
 
 
@@ -83,7 +83,7 @@ def test_raw_fallback_refuses_coarse_facets(tmp_path, monkeypatch):
         gmsh.write(str(stl))
     finally:
         gmsh.finalize()
-    with pytest.raises(ValueError, match="too coarse"):
+    with pytest.raises(config.UserError, match="too coarse"):
         mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)
 
 
@@ -119,5 +119,5 @@ def test_stl_with_several_solid_blocks(tmp_path):
 def test_stl_with_two_bodies_says_union_them(tmp_path):
     stl = tmp_path / "two.stl"
     ascii_stl(stl, [cube([0, 0, 0], 8.0) + cube([20, 0, 0], 8.0)])
-    with pytest.raises(ValueError, match="2 separate bodies"):
+    with pytest.raises(config.UserError, match="2 separate bodies"):
         mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)

@@ -35,8 +35,9 @@ mm, N, MPa, in the geometry file's own frame. STL has no units and is read as mm
   215 vs 12 MPa. So raw refuses facets longer than 2x mesh size and asks for a finer export or STEP.
 - Memory (CalculiX peak, fine v8c in Docker): 168k nodes 4.5 GB, 327k nodes 11.4 GB (12 min). It grows
   faster than the node count; a 12.5 GB Docker VM tops out around 330k.
-- Bad input (part.toml, geometry) raises `config.UserError`: `fsa` prints just the message. Anything else
-  keeps its traceback, so bugs stay loud. Don't catch plain `ValueError`.
+- Bad input (part.toml, geometry, run paths) raises `config.UserError`, not `sys.exit`. `fsa` prints just the
+  message for it and for a missing file; anything else keeps its traceback, so bugs stay loud. Don't catch
+  plain `ValueError`.
 - Tests: `tests/test_mesh.py` uses the host's gmsh wheel (no Docker); `-m slow` uses Docker via `bin/fsa`.
 - Bump `version` in `.claude-plugin/plugin.json` when the plugin changes, or installed users won't get updates.
 - `runs/` is gitignored. Copy any image worth keeping into `docs/`.
