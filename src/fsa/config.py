@@ -6,13 +6,22 @@ from pathlib import Path
 import numpy as np
 
 # Rough FDM values (MPa). "inplane" = along layers, "interlayer" = pulling layers apart.
+# printed=False: a milled/cast part, so no layers; "inplane" is the yield strength.
+TPU_WARNING = (
+    "TPU is soft and nearly incompressible: this linear solve is a rough guide. "
+    "Trust deflection more than stress; it can't predict tearing."
+)
 MATERIALS = {
     "PETG": dict(E=2000.0, nu=0.38, inplane=40.0, interlayer=20.0),
     "PLA": dict(E=3000.0, nu=0.36, inplane=45.0, interlayer=20.0),
     "ASA": dict(E=1900.0, nu=0.35, inplane=35.0, interlayer=17.0),
     "ABS": dict(E=1800.0, nu=0.35, inplane=33.0, interlayer=15.0),
     "PA-CF": dict(E=5000.0, nu=0.35, inplane=60.0, interlayer=25.0),
+    # nu 0.45, not 0.48+: tet10 elements lock as nu nears 0.5.
+    "TPU-95A": dict(E=26.0, nu=0.45, inplane=25.0, interlayer=15.0, warning=TPU_WARNING),
+    "AL6061-T6": dict(E=68900.0, nu=0.33, inplane=276.0, interlayer=276.0, printed=False),
 }
+MATERIAL_KEYS = {"preset", "E", "nu", "inplane", "interlayer", "printed", "warning"}
 DEFAULT_PRINT = {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}
 BIG = 1e9
 GEOMETRY_TYPES = (".step", ".stp", ".stl")
@@ -56,10 +65,23 @@ def geometry_file(raw, path):
 
 
 def material(m):
+    unknown = set(m) - MATERIAL_KEYS
+    if unknown:
+        raise ValueError(f"unknown [material] key(s) {sorted(unknown)}; have {sorted(MATERIAL_KEYS)}")
     if "preset" in m and m["preset"] not in MATERIALS:
         raise ValueError(f"unknown material preset {m['preset']!r}; have {', '.join(MATERIALS)}")
-    base = dict(MATERIALS[m["preset"]]) if "preset" in m else {}
-    base.update({k: float(v) for k, v in m.items() if k != "preset"})
+    base = {"printed": True, **MATERIALS[m["preset"]]} if "preset" in m else {"printed": True}
+    for k, v in m.items():
+        if k == "printed":
+            if not isinstance(v, bool):
+                raise ValueError(f"material.printed must be true or false, not {v!r}")
+            base[k] = v
+        elif k == "warning":
+            base[k] = str(v)
+        elif k != "preset":
+            base[k] = float(v)
+    if not base["printed"] and "inplane" in base:
+        base.setdefault("interlayer", base["inplane"])  # no layers, so the across-layer limit is moot
     missing = {"E", "nu", "inplane", "interlayer"} - base.keys()
     if missing:
         raise ValueError(f"material needs a preset ({', '.join(MATERIALS)}) or {sorted(missing)}")

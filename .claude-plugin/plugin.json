@@ -1,6 +1,6 @@
 {
   "name": "finite-stress-analysis",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Stress-check 3D-printed parts (gmsh + CalculiX FEA in Docker): heat maps, layer-adhesion check, design comparisons.",
   "author": { "name": "peterb154" },
   "repository": "https://github.com/peterb154/finite-stress-analysis",

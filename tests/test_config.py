@@ -116,3 +116,22 @@ def test_geometry_errors(tmp_path):
     p.write_text('geometry = "x.stl"\n' + MINIMAL + "[[cut]]\nstart = [0, 0, 0]\nvector = [1, 0, 0]\nr = 1\n")
     with pytest.raises(ValueError, match="STEP"):
         config.load(p)
+
+
+def test_printed_and_warning_fields():
+    al = config.material({"preset": "AL6061-T6"})
+    assert al["printed"] is False and al["inplane"] == 276.0
+    assert config.material({"preset": "PETG"})["printed"] is True
+    assert "warning" in config.material({"preset": "TPU-95A"})
+    assert config.material({"preset": "TPU-95A", "warning": ""})["warning"] == ""  # can be silenced
+    steel = config.material({"E": 200000, "nu": 0.3, "inplane": 250, "printed": False})
+    assert steel["interlayer"] == 250.0  # no layers, so not required
+    with pytest.raises(ValueError, match="interlayer"):
+        config.material({"E": 2000, "nu": 0.3, "inplane": 40})
+
+
+def test_material_rejects_typos_and_non_bool_printed():
+    with pytest.raises(ValueError, match="prnted"):
+        config.material({"preset": "AL6061-T6", "prnted": False})
+    with pytest.raises(ValueError, match="true or false"):
+        config.material({"preset": "PETG", "printed": "false"})  # bool("false") would be True
