@@ -61,5 +61,8 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
   and says to repair it (slicer repair, MeshLab, Meshmixer) or export STEP. `[[cut]]` needs STEP. Holes are
   faceted, so stresses at holes and fillets are a bit noisier than from STEP (the peak von Mises on the
   example lands within a few %). Selectors still work: they pick nodes by position, not CAD faces.
+- If fsa prints "couldn't remesh the surface", the mesh follows the STL's own triangles and can get big
+  (v8c from a 2 mm STL: ~300k nodes on the fine run, too much for a 12 GB Docker VM). Use a coarser STL
+  export, a larger `mesh.fine`, or STEP.
 - A node can't be both fixed and in a load path (or in two load paths). fsa stops and names the pair;
   shrink a cylinder's `r`/`span` or a box.

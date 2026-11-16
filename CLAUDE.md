@@ -27,6 +27,8 @@ mm, N, MPa, in the geometry file's own frame. STL has no units and is read as mm
 - STL meshing (`mesh.mesh_stl`) tries several `classifySurfaces` angles, then the raw triangles. Which
   angle works depends on the part. Restart gmsh between attempts: `gmsh.clear()` leaves state behind and
   later attempts mesh to nothing. An open STL "meshes" without error but gives no tets, so check for that.
+  Remeshing is flaky: v8c's STL remeshes on `--coarse` but not on the fine run, which falls back to raw
+  triangles (~300k nodes). The slow test only checks the coarse run.
 - Tests: `tests/test_mesh.py` uses the host's gmsh wheel (no Docker); `-m slow` uses Docker via `bin/fsa`.
 - Bump `version` in `.claude-plugin/plugin.json` when the plugin changes, or installed users won't get updates.
 - `runs/` is gitignored. Copy any image worth keeping into `docs/`.

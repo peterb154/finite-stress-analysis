@@ -65,7 +65,10 @@ def mesh_stl(gmsh, path, m, size, fine):
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.merge(str(path))
         if angle is None:
-            print(f"{path.name}: remeshing the surface failed; meshing on the STL's own triangles")
+            print(
+                f"{path.name}: couldn't remesh the surface, so the mesh follows the STL's own triangles "
+                "(mesh.size/fine only apply inside). If the run is slow or killed, export a coarser STL or use STEP."
+            )
         try:
             if angle is not None:
                 gmsh.model.mesh.classifySurfaces(angle * math.pi / 180, True, True, math.pi)
