@@ -21,6 +21,7 @@ MATERIALS = {
     "TPU-95A": dict(E=26.0, nu=0.45, inplane=25.0, interlayer=15.0, warning=TPU_WARNING),
     "AL6061-T6": dict(E=68900.0, nu=0.33, inplane=276.0, interlayer=276.0, printed=False),
 }
+MATERIAL_KEYS = {"preset", "E", "nu", "inplane", "interlayer", "printed", "warning"}
 DEFAULT_PRINT = {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}
 BIG = 1e9
 GEOMETRY_TYPES = (".step", ".stp", ".stl")
@@ -64,12 +65,17 @@ def geometry_file(raw, path):
 
 
 def material(m):
+    unknown = set(m) - MATERIAL_KEYS
+    if unknown:
+        raise ValueError(f"unknown [material] key(s) {sorted(unknown)}; have {sorted(MATERIAL_KEYS)}")
     if "preset" in m and m["preset"] not in MATERIALS:
         raise ValueError(f"unknown material preset {m['preset']!r}; have {', '.join(MATERIALS)}")
     base = {"printed": True, **MATERIALS[m["preset"]]} if "preset" in m else {"printed": True}
     for k, v in m.items():
         if k == "printed":
-            base[k] = bool(v)
+            if not isinstance(v, bool):
+                raise ValueError(f"material.printed must be true or false, not {v!r}")
+            base[k] = v
         elif k == "warning":
             base[k] = str(v)
         elif k != "preset":
