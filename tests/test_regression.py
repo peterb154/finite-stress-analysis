@@ -45,5 +45,8 @@ def test_stl_matches_step(tmp_path, write_stl):
     case = "tilt_pull_40N_top"
     subprocess.run([ROOT / "bin" / "fsa", "run", "v8c.toml", "--coarse", "--cases", case], cwd=d, check=True)
     stl = json.loads((d / "runs" / "v8c" / "summary.json").read_text())["cases"][case]
-    assert stl["vm_max"] == pytest.approx(step["vm_max"], rel=0.15)
-    assert stl["max_disp_mm"] == pytest.approx(step["max_disp_mm"], rel=0.15)
+    # Deflection is a whole-part number and agrees closely. The coarse peak sits at a sharp corner and moves
+    # with the mesh: the STEP peak alone is 16.4 MPa on macOS and 15.0 on Linux CI (different gmsh builds),
+    # and STL gave 16.3 and 11.4. So the peak is only a sanity bound (catches wrong supports or units).
+    assert stl["max_disp_mm"] == pytest.approx(step["max_disp_mm"], rel=0.10)
+    assert stl["vm_max"] == pytest.approx(step["vm_max"], rel=0.30)

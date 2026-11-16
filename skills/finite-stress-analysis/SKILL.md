@@ -59,8 +59,8 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
 - The geometry must be one solid body inside the folder you run from. Union multi-body parts in CAD first.
 - STL limits: it must be watertight and not intersect itself. Downloaded models often aren't. fsa then stops
   and says to repair it (slicer repair, MeshLab, Meshmixer) or export STEP. `[[cut]]` needs STEP. Holes are
-  faceted, so stresses at holes and fillets are a bit noisier than from STEP (the peak von Mises on the
-  example lands within a few %). Selectors still work: they pick nodes by position, not CAD faces.
+  faceted and meshed coarser, so peak and layer stresses are noisier than from STEP (on the example:
+  deflection within ~5 %, coarse peak von Mises within ~25 %). Trust STL results less, and keep the margin. Selectors still work: they pick nodes by position, not CAD faces.
 - If fsa prints "couldn't remesh the surface", the mesh follows the STL's own triangles and can get big
   (v8c from a 2 mm STL: ~300k nodes on the fine run, too much for a 12 GB Docker VM). Use a coarser STL
   export, a larger `mesh.fine`, or STEP.
