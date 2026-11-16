@@ -16,6 +16,8 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           version: "0.11.32"
+      - name: system libraries the gmsh wheel links against
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libglu1-mesa libxcursor1 libxft2 libxinerama1
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -33,5 +35,7 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           version: "0.11.32"
+      - name: system libraries the gmsh wheel links against
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends libglu1-mesa libxcursor1 libxft2 libxinerama1
       - run: uv sync --frozen
       - run: uv run pytest -q -m slow
