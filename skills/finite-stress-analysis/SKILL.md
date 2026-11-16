@@ -57,8 +57,8 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
 
 - fsa forces CalculiX's solver single-threaded: the multithreaded solver in Debian's CalculiX gave wrong
   stresses. Don't work around it.
-- Memory: about 180k nodes fits in a ~12 GB Docker VM; ~300k does not. If the run dies, raise `mesh.fine`
-  or shrink the `refine` boxes.
+- Memory: ~170k nodes needs ~4.5 GB, ~330k needs ~11.5 GB (a 12 GB Docker VM's limit). If the run dies,
+  raise `mesh.fine` or shrink the `refine` boxes.
 - A rigid `load_path` makes whatever it touches infinitely stiff. Fine for a monitor or a steel bracket; for
   a soft neighbour, expect it to over-stiffen the part locally.
 - Units: fsa converts STEP to mm. STL has no units and is read as mm. fsa prints the bounding box at the
@@ -67,7 +67,8 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
 - STL limits: it must be watertight and not intersect itself. Downloaded models often aren't. fsa then stops
   and says to repair it (slicer repair, MeshLab, Meshmixer) or export STEP. `[[cut]]` needs STEP. Holes are
   faceted and meshed coarser, so peak and layer stresses are noisier than from STEP (on the example:
-  deflection within ~5 %, coarse peak von Mises within ~25 %). Trust STL results less, and keep the margin. Selectors still work: they pick nodes by position, not CAD faces.
+  deflection within ~5 %, coarse peak von Mises within ~25 %). If gmsh can't remesh an STL and its triangles are
+  long (typical of CAD exports), fsa stops and asks for STEP or a re-export with a small maximum edge length. Trust STL results less, and keep the margin. Selectors still work: they pick nodes by position, not CAD faces.
 - If fsa prints "couldn't remesh the surface", the mesh follows the STL's own triangles and can get big
   (v8c from a 2 mm STL: ~300k nodes on the fine run, too much for a 12 GB Docker VM). Use a coarser STL
   export, a larger `mesh.fine`, or STEP.

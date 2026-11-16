@@ -27,8 +27,14 @@ mm, N, MPa, in the geometry file's own frame. STL has no units and is read as mm
 - STL meshing (`mesh.mesh_stl`) tries several `classifySurfaces` angles, then the raw triangles. Which
   angle works depends on the part. Restart gmsh between attempts: `gmsh.clear()` leaves state behind and
   later attempts mesh to nothing. An open STL "meshes" without error but gives no tets, so check for that.
-  Remeshing is flaky: v8c's STL remeshes on `--coarse` but not on the fine run, which falls back to raw
-  triangles (~300k nodes). The slow test only checks the coarse run.
+  Remeshing is flaky ("overlapping facets"), and which angles work changes with the gmsh build (Docker has
+  Debian's 4.8, the host wheel is 4.15) and the STL. Fusion's v8c STL never remeshes in Docker, so it uses raw.
+  Raw splits the STL into shells (outer skin + internal voids): one surface loop for all of them fills the
+  voids and leaves their nodes out of every tet. Every attempt checks the tet volume against the STL's.
+  Raw is only as good as the STL's triangles: a 2 mm STL matched STEP, Fusion's (facets up to 118 mm) gave
+  215 vs 12 MPa. So raw refuses facets longer than 2x mesh size and asks for a finer export or STEP.
+- Memory (CalculiX peak, fine v8c in Docker): 168k nodes 4.5 GB, 327k nodes 11.4 GB (12 min). It grows
+  faster than the node count; a 12.5 GB Docker VM tops out around 330k.
 - Tests: `tests/test_mesh.py` uses the host's gmsh wheel (no Docker); `-m slow` uses Docker via `bin/fsa`.
 - Bump `version` in `.claude-plugin/plugin.json` when the plugin changes, or installed users won't get updates.
 - `runs/` is gitignored. Copy any image worth keeping into `docs/`.
