@@ -66,9 +66,9 @@ def mesh_stl(gmsh, path, m, size, fine):
     the requested size, and close them into one volume. Last resort: keep the STL's own triangles."""
     gmsh.merge(str(path))
     print_bounding_box(gmsh, path)
-    stl_vol = solid_volume(gmsh)
-    c = stl_triangles(gmsh)[1]
-    longest = np.linalg.norm(c - np.roll(c, 1, axis=1), axis=2).max()
+    _, corners, tri = stl_triangles(gmsh)
+    stl_vol = solid_volume(path, corners, connected_triangles(tri))
+    longest = np.linalg.norm(corners - np.roll(corners, 1, axis=1), axis=2).max()
     errors = []
     for angle in [*STL_ANGLES, None]:
         gmsh.finalize()  # a failed attempt leaves state behind that gmsh.clear() doesn't reset
@@ -103,13 +103,14 @@ def mesh_stl(gmsh, path, m, size, fine):
 
 
 def stl_triangles(gmsh):
-    """The merged STL's one surface: its tag, triangle corner coordinates (n, 3, 3) and node tags (n, 3)."""
-    ((_, surf),) = gmsh.model.getEntities(2)
-    tags, xyz, _ = gmsh.model.mesh.getNodes(2, surf, True)
-    idx = dict(zip(tags.astype(int), range(len(tags))))
-    _, _, tri = gmsh.model.mesh.getElements(2, surf)
-    tri = tri[0].reshape(-1, 3).astype(int)
-    return surf, xyz.reshape(-1, 3)[np.vectorize(idx.get)(tri)], tri
+    """The merged STL's surfaces (one per `solid` block), triangle corners (n, 3, 3) and node tags (n, 3)."""
+    surfs = gmsh.model.getEntities(2)
+    tags, xyz, _ = gmsh.model.mesh.getNodes(-1, -1, True)
+    tags = tags.astype(int)
+    idx = np.zeros(tags.max() + 1, int)
+    idx[tags] = np.arange(len(tags))
+    tri = np.concatenate([gmsh.model.mesh.getElements(2, s)[2][0] for _, s in surfs]).reshape(-1, 3).astype(int)
+    return surfs, xyz.reshape(-1, 3)[idx[tri]], tri
 
 
 def check_facet_size(path, longest, size):
@@ -125,26 +126,33 @@ def check_facet_size(path, longest, size):
         )
 
 
-def solid_volume(gmsh):
-    """Volume of the solid the STL describes: the largest shell minus the others (internal voids).
+def solid_volume(path, corners, shell):
+    """Volume of the solid the STL describes: the outer shell minus the others (internal voids).
     Per-shell abs() so it doesn't depend on which way the STL's triangles are wound."""
-    _, corners, tri = stl_triangles(gmsh)
-    shell = connected_triangles(tri)
-    vols = sorted(
-        abs(np.einsum("ij,ij->i", c[:, 0], np.cross(c[:, 1], c[:, 2])).sum()) / 6
-        for c in (corners[shell == k] for k in np.unique(shell))
-    )
-    return vols[-1] - sum(vols[:-1])
+    shells = []
+    for k in np.unique(shell):
+        c = corners[shell == k]
+        vol = abs(np.einsum("ij,ij->i", c[:, 0], np.cross(c[:, 1], c[:, 2])).sum()) / 6
+        shells.append((vol, c.reshape(-1, 3).min(0), c.reshape(-1, 3).max(0)))
+    shells.sort(key=lambda s: s[0], reverse=True)
+    (outer, lo, hi), voids = shells[0], shells[1:]
+    apart = sum(not ((v_lo >= lo).all() and (v_hi <= hi).all()) for _, v_lo, v_hi in voids)
+    if apart:
+        raise ValueError(
+            f"{path.name} has {apart + 1} separate bodies; fsa needs exactly one. "
+            "Combine (boolean union) the bodies in CAD and re-export."
+        )
+    return outer - sum(v for v, _, _ in voids)
 
 
 def split_shells(gmsh):
     """Put each closed shell of the STL (outer skin, internal voids) on its own surface, keeping the
     triangles. One surface loop for all of them fills the voids and orphans their nodes. Outer shell first."""
-    surf, corners, tri = stl_triangles(gmsh)
-    tags, xyz, _ = gmsh.model.mesh.getNodes(2, surf, True)
+    stl_surfs, corners, tri = stl_triangles(gmsh)
+    tags, xyz, _ = gmsh.model.mesh.getNodes(-1, -1, True)
     xyz = dict(zip(tags.astype(int), xyz.reshape(-1, 3)))
     shell = connected_triangles(tri)
-    gmsh.model.removeEntities([(2, surf)])  # also drops its nodes: add them back per shell
+    gmsh.model.removeEntities(stl_surfs, recursive=True)  # also drops their nodes: add them back per shell
     surfs = []
     for k in np.unique(shell):
         t = tri[shell == k]

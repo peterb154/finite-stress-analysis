@@ -85,3 +85,39 @@ def test_raw_fallback_refuses_coarse_facets(tmp_path, monkeypatch):
         gmsh.finalize()
     with pytest.raises(ValueError, match="too coarse"):
         mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)
+
+
+def ascii_stl(path, blocks):
+    """blocks: one list of (3, 3) triangles per `solid ... endsolid` block."""
+    lines = []
+    for k, tris in enumerate(blocks):
+        lines.append(f"solid b{k}")
+        for t in tris:
+            lines += ["facet normal 0 0 0", "outer loop", *(f"vertex {x} {y} {z}" for x, y, z in t)]
+            lines += ["endloop", "endfacet"]
+        lines.append(f"endsolid b{k}")
+    path.write_text("\n".join(lines) + "\n")
+
+
+def cube(origin, side):
+    v = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]])
+    v = np.asarray(origin, float) + v * side
+    faces = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4)]
+    faces += [(1, 2, 6), (1, 6, 5), (2, 3, 7), (2, 7, 6), (3, 0, 4), (3, 4, 7)]
+    return [v[list(f)] for f in faces]
+
+
+def test_stl_with_several_solid_blocks(tmp_path):
+    # Some exporters write one `solid` block per body or colour: here one cube split over two blocks.
+    c = cube([0, 0, 0], 8.0)
+    stl = tmp_path / "blocks.stl"
+    ascii_stl(stl, [c[:6], c[6:]])
+    _, _, tets, _ = mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)
+    assert len(tets) > 10
+
+
+def test_stl_with_two_bodies_says_union_them(tmp_path):
+    stl = tmp_path / "two.stl"
+    ascii_stl(stl, [cube([0, 0, 0], 8.0) + cube([20, 0, 0], 8.0)])
+    with pytest.raises(ValueError, match="2 separate bodies"):
+        mesh({"geometry": stl, "mesh": MESH, "cuts": []}, 4.0, 4.0)
