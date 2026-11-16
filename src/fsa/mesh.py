@@ -2,6 +2,8 @@
 
 import math
 
+import numpy as np
+
 # Rebuilding surfaces from STL triangles fails at some feature angles and works at others,
 # depending on the part (v8c: 40 and 60 deg fail, 20 and 89 work). Try these in turn.
 STL_ANGLES = (40, 20, 89)
@@ -11,8 +13,8 @@ STL_HELP = (
 )
 
 
-class EmptyMesh(Exception):
-    """gmsh finished without error but made no tets (an open STL does this)."""
+class BadMesh(Exception):
+    """gmsh finished without error but the tets are wrong: none at all (open STL) or the wrong volume."""
 
 
 def mesh(cfg, size, fine):
@@ -62,6 +64,11 @@ def load_step(gmsh, path, cuts):
 def mesh_stl(gmsh, path, m, size, fine):
     """STL has no units (assumed mm) and no CAD faces: rebuild surfaces from the triangles, remesh at
     the requested size, and close them into one volume. Last resort: keep the STL's own triangles."""
+    gmsh.merge(str(path))
+    print_bounding_box(gmsh, path)
+    stl_vol = solid_volume(gmsh)
+    c = stl_triangles(gmsh)[1]
+    longest = np.linalg.norm(c - np.roll(c, 1, axis=1), axis=2).max()
     errors = []
     for angle in [*STL_ANGLES, None]:
         gmsh.finalize()  # a failed attempt leaves state behind that gmsh.clear() doesn't reset
@@ -69,27 +76,114 @@ def mesh_stl(gmsh, path, m, size, fine):
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.merge(str(path))
         try:
-            if angle is not None:
+            if angle is None:
+                loops = [gmsh.model.geo.addSurfaceLoop([s]) for s in split_shells(gmsh)]
+            else:
                 gmsh.model.mesh.classifySurfaces(angle * math.pi / 180, True, True, math.pi)
                 gmsh.model.mesh.createGeometry()
-            surfs = [s for _, s in gmsh.model.getEntities(2)]
-            gmsh.model.geo.addVolume([gmsh.model.geo.addSurfaceLoop(surfs)])
+                loops = [gmsh.model.geo.addSurfaceLoop([s for _, s in gmsh.model.getEntities(2)])]
+            gmsh.model.geo.addVolume(loops)  # first loop is the outside, the rest are holes
             gmsh.model.geo.synchronize()
-            if not errors:
-                print_bounding_box(gmsh, path)
             generate(gmsh, m, size, fine, from_curvature=0)  # facets look curved everywhere
+            check_volume(gmsh, stl_vol)
+            if angle is None:  # last, so an open or broken STL gets the "repair it" message instead
+                check_facet_size(path, longest, size)
         except Exception as e:
-            if type(e) not in (Exception, EmptyMesh):  # gmsh raises plain Exception; anything else is a bug
+            if type(e) not in (Exception, BadMesh):  # gmsh raises plain Exception; anything else is a bug
                 raise
             errors.append(f"{angle or 'raw'}: {e}")
             continue
         if angle is None:
             print(
                 f"{path.name}: couldn't remesh the surface, so the mesh follows the STL's own triangles "
-                "(mesh.size/fine only apply inside). If the run is slow or killed, export a coarser STL or use STEP."
+                "(mesh.size/fine only apply inside)."
             )
         return
     raise ValueError(f"{path.name}: {STL_HELP}. gmsh said: {'; '.join(errors)}")
+
+
+def stl_triangles(gmsh):
+    """The merged STL's one surface: its tag, triangle corner coordinates (n, 3, 3) and node tags (n, 3)."""
+    ((_, surf),) = gmsh.model.getEntities(2)
+    tags, xyz, _ = gmsh.model.mesh.getNodes(2, surf, True)
+    idx = dict(zip(tags.astype(int), range(len(tags))))
+    _, _, tri = gmsh.model.mesh.getElements(2, surf)
+    tri = tri[0].reshape(-1, 3).astype(int)
+    return surf, xyz.reshape(-1, 3)[np.vectorize(idx.get)(tri)], tri
+
+
+def check_facet_size(path, longest, size):
+    """The raw fallback keeps the STL's triangles. CAD exports have long thin facets (Fusion's v8c: up to
+    118 mm), which make bad tets and starve the support/load patches of nodes: 215 MPa where STEP says 12.
+    With facets no longer than the mesh size, raw matched STEP (12.1 vs 11.7 MPa)."""
+    if longest > 2 * size:
+        raise ValueError(
+            f"{path.name}: gmsh couldn't remesh this STL, and its own triangles are too coarse to use "
+            f"(up to {longest:.0f} mm long, mesh size {size:g} mm): the results would be wrong. Use STEP, or "
+            f"re-export the STL with a maximum edge length of about {size:g} mm "
+            "(Fusion: Refinement > Custom > Maximum Edge Length)."
+        )
+
+
+def solid_volume(gmsh):
+    """Volume of the solid the STL describes: the largest shell minus the others (internal voids).
+    Per-shell abs() so it doesn't depend on which way the STL's triangles are wound."""
+    _, corners, tri = stl_triangles(gmsh)
+    shell = connected_triangles(tri)
+    vols = sorted(
+        abs(np.einsum("ij,ij->i", c[:, 0], np.cross(c[:, 1], c[:, 2])).sum()) / 6
+        for c in (corners[shell == k] for k in np.unique(shell))
+    )
+    return vols[-1] - sum(vols[:-1])
+
+
+def split_shells(gmsh):
+    """Put each closed shell of the STL (outer skin, internal voids) on its own surface, keeping the
+    triangles. One surface loop for all of them fills the voids and orphans their nodes. Outer shell first."""
+    surf, corners, tri = stl_triangles(gmsh)
+    tags, xyz, _ = gmsh.model.mesh.getNodes(2, surf, True)
+    xyz = dict(zip(tags.astype(int), xyz.reshape(-1, 3)))
+    shell = connected_triangles(tri)
+    gmsh.model.removeEntities([(2, surf)])  # also drops its nodes: add them back per shell
+    surfs = []
+    for k in np.unique(shell):
+        t = tri[shell == k]
+        nodes = np.unique(t)
+        s = gmsh.model.addDiscreteEntity(2)
+        gmsh.model.mesh.addNodes(2, s, nodes, np.array([xyz[n] for n in nodes]).ravel())
+        gmsh.model.mesh.addElementsByType(s, 2, [], t.ravel())
+        lo, hi = corners[shell == k].reshape(-1, 3).min(0), corners[shell == k].reshape(-1, 3).max(0)
+        surfs.append((np.prod(hi - lo), s))
+    return [s for _, s in sorted(surfs, reverse=True)]
+
+
+def connected_triangles(tri):
+    """Label each triangle with its connected piece (triangles sharing a node are connected)."""
+    parent = {}
+
+    def root(a):
+        while parent.setdefault(a, a) != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for a, b, c in tri:
+        rc = root(c)
+        parent[root(a)] = rc
+        parent[root(b)] = rc
+    return np.array([root(a) for a in tri[:, 0]])
+
+
+def check_volume(gmsh, expected, rel=0.02):
+    tags, xyz, _ = gmsh.model.mesh.getNodes()
+    tags = tags.astype(int)
+    idx = np.zeros(tags.max() + 1, int)
+    idx[tags] = np.arange(len(tags))
+    _, _, e = gmsh.model.mesh.getElements(3)
+    p = xyz.reshape(-1, 3)[idx[e[0].reshape(-1, 10)[:, :4].astype(int)]]
+    vol = abs(np.einsum("ij,ij->i", p[:, 1] - p[:, 0], np.cross(p[:, 2] - p[:, 0], p[:, 3] - p[:, 0]))).sum() / 6
+    if abs(vol - expected) > rel * expected:
+        raise BadMesh(f"meshed volume {vol:.0f} mm3, but the STL encloses {expected:.0f} (a void filled or lost)")
 
 
 def generate(gmsh, m, size, fine, from_curvature=12):
@@ -116,7 +210,7 @@ def generate(gmsh, m, size, fine, from_curvature=12):
     gmsh.option.setNumber("Mesh.SecondOrderLinear", int(bool(m["straight_tets"])))
     gmsh.model.mesh.generate(3)
     if len(gmsh.model.mesh.getElements(3)[0]) == 0:  # an open STL "meshes" fine, with no volume elements
-        raise EmptyMesh("no volume elements: the surface is not closed")
+        raise BadMesh("no volume elements: the surface is not closed")
 
 
 def print_bounding_box(gmsh, path):
