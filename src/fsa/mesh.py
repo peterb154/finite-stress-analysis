@@ -4,6 +4,8 @@ import math
 
 import numpy as np
 
+from .config import UserError
+
 # Rebuilding surfaces from STL triangles fails at some feature angles and works at others,
 # depending on the part (v8c: 40 and 60 deg fail, 20 and 89 work). Try these in turn.
 STL_ANGLES = (40, 20, 89)
@@ -22,7 +24,7 @@ def mesh(cfg, size, fine):
 
     geo = cfg["geometry"]
     if not geo.is_file():
-        raise FileNotFoundError(
+        raise UserError(
             f"{geo} not found. It must be inside the folder fsa runs from (the container sees nothing else)."
         )
     gmsh.initialize()
@@ -51,7 +53,7 @@ def load_step(gmsh, path, cuts):
     gmsh.model.occ.synchronize()
     vols = gmsh.model.getEntities(3)
     if len(vols) != 1:
-        raise ValueError(
+        raise UserError(
             f"{path.name} has {len(vols)} solid bodies; fsa needs exactly one. "
             "Combine (boolean union) the bodies in CAD and re-export."
         )
@@ -99,7 +101,7 @@ def mesh_stl(gmsh, path, m, size, fine):
                 "(mesh.size/fine only apply inside)."
             )
         return
-    raise ValueError(f"{path.name}: {STL_HELP}. gmsh said: {'; '.join(errors)}")
+    raise UserError(f"{path.name}: {STL_HELP}. gmsh said: {'; '.join(errors)}")
 
 
 def stl_triangles(gmsh):
@@ -118,7 +120,7 @@ def check_facet_size(path, longest, size):
     118 mm), which make bad tets and starve the support/load patches of nodes: 215 MPa where STEP says 12.
     With facets no longer than the mesh size, raw matched STEP (12.1 vs 11.7 MPa)."""
     if longest > 2 * size:
-        raise ValueError(
+        raise UserError(
             f"{path.name}: gmsh couldn't remesh this STL, and its own triangles are too coarse to use "
             f"(up to {longest:.0f} mm long, mesh size {size:g} mm): the results would be wrong. Use STEP, or "
             f"re-export the STL with a maximum edge length of about {size:g} mm "
@@ -138,7 +140,7 @@ def solid_volume(path, corners, shell):
     (outer, lo, hi), voids = shells[0], shells[1:]
     apart = sum(not ((v_lo >= lo).all() and (v_hi <= hi).all()) for _, v_lo, v_hi in voids)
     if apart:
-        raise ValueError(
+        raise UserError(
             f"{path.name} has {apart + 1} separate bodies; fsa needs exactly one. "
             "Combine (boolean union) the bodies in CAD and re-export."
         )

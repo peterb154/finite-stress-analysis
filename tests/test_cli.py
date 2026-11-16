@@ -69,3 +69,20 @@ def test_tpu_warning_reaches_summary(capsys):
     assert "linear" in result["material"]["warning"]
     cli.print_table(result)
     assert "WARNING" in capsys.readouterr().out
+
+
+def test_bad_input_exits_with_message_not_traceback(tmp_path, capsys):
+    toml = tmp_path / "p.toml"
+    toml.write_text('geometry = "p.step"\n')  # no material, supports or cases
+    with pytest.raises(SystemExit) as e:
+        cli.main(["run", str(toml)])
+    assert str(e.value).startswith("fsa: material needs a preset")
+
+
+def test_bugs_still_raise(monkeypatch):
+    def boom(*_):
+        raise ValueError("a bug, not bad input")
+
+    monkeypatch.setattr(cli, "render_field", boom)
+    with pytest.raises(ValueError, match="a bug"):
+        cli.main(["render", "runs/x", "case"])

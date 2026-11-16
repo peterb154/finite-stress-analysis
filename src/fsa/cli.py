@@ -228,4 +228,7 @@ def main(argv=None):
     c.add_argument("--out", default="compare.png")
     c.set_defaults(fn=compare)
     args = ap.parse_args(argv)
-    args.fn(args)
+    try:
+        args.fn(args)
+    except (config.UserError, FileNotFoundError) as e:  # bad input: the message says what to fix
+        sys.exit(f"fsa: {e}")
