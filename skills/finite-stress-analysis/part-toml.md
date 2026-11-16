@@ -7,9 +7,12 @@ name = "bracket_v2"       # optional; default = file name. Output goes to runs/<
 geometry = "bracket_v2.step"   # .step/.stp, or .stl (assumed mm). The older key `step` still works.
 
 [material]
-preset = "PETG"           # PETG | PLA | ASA | ABS | PA-CF
+preset = "PETG"           # PETG | PLA | ASA | ABS | PA-CF | TPU-95A | AL6061-T6
 # Override or replace the preset (MPa): E, nu, inplane (along layers), interlayer (across layers)
 # interlayer = 15
+# printed = false         # milled/cast part: no layer-tension check or print orientation; inplane = yield.
+                          # interlayer is then optional. AL6061-T6 sets this.
+# warning = "..."         # printed in the run summary and saved in summary.json. TPU-95A sets one; "" clears it.
 
 [mesh]
 size = 5.0                # element size away from refine boxes

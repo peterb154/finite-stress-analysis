@@ -42,6 +42,13 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
   with the lowest worst-case layer tension.
 - Margin = strength / peak. Aim for **2x or more** in-plane and across layers: the material numbers are rough,
   FDM parts vary, and the model is linear and isotropic.
+- **Metal** (`AL6061-T6`, or any `printed = false` material): there are no layers, so fsa skips layer tension
+  and the print orientation and renders only von Mises. Margin = yield (`inplane`) / peak. Metal is
+  consistent, so 1.5x on yield is a common target; use more if loads are uncertain or there's fatigue.
+- **TPU** (`TPU-95A`): soft and nearly incompressible, so a linear small-strain solve is only a rough guide.
+  Use it for "does it flex too much" (`max_disp_mm`), not for "will it tear". If deflection is more than a
+  few % of the part's size, the numbers are well outside the linear range. Keep `nu` at 0.45 or below:
+  closer to 0.5, tet10 elements lock and come out too stiff.
 - `max_disp_mm`: how far it moves. Often the real complaint (a wobbly monitor) before strength is.
 - Results are most trustworthy as **comparisons** between designs with the same config.
   Peaks at sharp inside corners grow as the mesh gets finer: suggest a fillet rather than trusting the number.

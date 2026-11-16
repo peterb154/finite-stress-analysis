@@ -47,7 +47,31 @@ def run(args):
 
     bc_nodes = np.concatenate([fixed, *(v[0] for v in paths.values())])
     ok = ~post.near_bc(xyz, xyz[idx[bc_nodes]])
+    result, fields = summarise(cfg, cases, steps, ids, xyz, ok, [size, fine])
+    (out / "summary.json").write_text(json.dumps(result, indent=1))
+    post.write_vtu(out / "results.vtu", xyz, idx[tets], fields)
+    mat, worst = cfg["material"], result["worst_case"]
+    maps = [("vm", mat["inplane"])]
+    if mat["printed"]:
+        maps.append((f"layer_{result['best_print_orientation']}", mat["interlayer"]))
+    for key, lim in maps:
+        render.render(
+            out / f"{worst}_{key}.png",
+            f"{cfg['name']} | {worst} | {key}",
+            xyz,
+            idx[tets],
+            fields[f"{worst}_{key}"],
+            ok,
+            lim,
+        )
+    print_table(result)
+    print(f"wrote {out}/ in {time.time() - t0:.0f} s")
+
+
+def summarise(cfg, cases, steps, ids, xyz, ok, mesh_mm):
+    """summary.json contents + per-node fields. Layer tension only for printed materials."""
     mat = cfg["material"]
+    orients = cfg["print"] if mat["printed"] else {}
     summary, fields = {}, {"bc_excluded": (~ok).astype(float)}
     for (cname, loads), st in zip(cases.items(), steps):
         s = np.array([st["STRESS"][i][:6] for i in ids])
@@ -60,11 +84,10 @@ def run(args):
             "max_disp_mm": round(float(np.linalg.norm(u, axis=1).max()), 3),
         }
         row["vm_max"], row["vm_max_at"] = post.peak(vm, xyz, ok)
-        row["layer_tension"] = {}
-        for o, n in cfg["print"].items():
+        for o, n in orients.items():
             lt = post.normal_stress(s, n)
             mx, at = post.peak(lt, xyz, ok)
-            row["layer_tension"][o] = {"max": mx, "at": at}
+            row.setdefault("layer_tension", {})[o] = {"max": mx, "at": at}
             fields[f"{cname}_layer_{o}"] = lt
         for z in cfg["zones"]:
             lo, hi = np.array(z["box"], float).reshape(2, 3)
@@ -74,31 +97,19 @@ def run(args):
         fields[f"{cname}_vm"] = vm
         fields[f"{cname}_U"] = u
 
-    worst = max(summary, key=lambda c: summary[c]["vm_max"])
-    best_print = min(cfg["print"], key=lambda o: max(r["layer_tension"][o]["max"] for r in summary.values()))
     result = {
         "name": cfg["name"],
         "material": mat,
-        "mesh_mm": [size, fine],
-        "worst_case": worst,
-        "best_print_orientation": best_print,
-        "print_orientations": {k: v.tolist() for k, v in cfg["print"].items()},
-        "cases": summary,
+        "mesh_mm": mesh_mm,
+        "worst_case": max(summary, key=lambda c: summary[c]["vm_max"]),
     }
-    (out / "summary.json").write_text(json.dumps(result, indent=1))
-    post.write_vtu(out / "results.vtu", xyz, idx[tets], fields)
-    for key, lim in [("vm", mat["inplane"]), (f"layer_{best_print}", mat["interlayer"])]:
-        render.render(
-            out / f"{worst}_{key}.png",
-            f"{cfg['name']} | {worst} | {key}",
-            xyz,
-            idx[tets],
-            fields[f"{worst}_{key}"],
-            ok,
-            lim,
+    if orients:
+        result["best_print_orientation"] = min(
+            orients, key=lambda o: max(r["layer_tension"][o]["max"] for r in summary.values())
         )
-    print_table(result)
-    print(f"wrote {out}/ in {time.time() - t0:.0f} s")
+        result["print_orientations"] = {k: v.tolist() for k, v in orients.items()}
+    result["cases"] = summary
+    return result, fields
 
 
 def select_bcs(cfg, surf, sp):
@@ -134,17 +145,24 @@ def pick_cases(cases, sel):
 
 
 def print_table(r):
-    mat, orients = r["material"], list(r["print_orientations"])
-    print(f"\n{'case':28s} {'vM max':>7s} " + " ".join(f"{'lay-' + o:>9s}" for o in orients) + f" {'disp mm':>8s}")
+    mat, orients = r["material"], list(r.get("print_orientations", {}))
+    print(f"\n{'case':28s} {'vM max':>7s} " + "".join(f" {'lay-' + o:>9s}" for o in orients) + f" {'disp mm':>8s}")
     for c, row in r["cases"].items():
-        lt = " ".join(f"{row['layer_tension'][o]['max']:9.1f}" for o in orients)
-        print(f"{c:28s} {row['vm_max']:7.1f} {lt} {row['max_disp_mm']:8.2f}")
+        lt = "".join(f" {row['layer_tension'][o]['max']:9.1f}" for o in orients)
+        print(f"{c:28s} {row['vm_max']:7.1f}{lt} {row['max_disp_mm']:8.2f}")
     w = r["cases"][r["worst_case"]]
-    print(f"limits: in-plane {mat['inplane']:g} MPa, across layers {mat['interlayer']:g} MPa")
-    print(
+    worst = (
         f"worst case: {r['worst_case']} (peak {w['vm_max']:.1f} MPa at {w['vm_max_at']}, "
-        f"margin {mat['inplane'] / w['vm_max']:.1f}x); best print orientation: {r['best_print_orientation']}"
+        f"margin {mat['inplane'] / w['vm_max']:.1f}x)"
     )
+    if orients:
+        print(f"limits: in-plane {mat['inplane']:g} MPa, across layers {mat['interlayer']:g} MPa")
+        print(f"{worst}; best print orientation: {r['best_print_orientation']}")
+    else:
+        print(f"limit: yield {mat['inplane']:g} MPa (not printed: no layer check)")
+        print(worst)
+    if mat.get("warning"):
+        print(f"WARNING: {mat['warning']}")
 
 
 def load_run(d):
