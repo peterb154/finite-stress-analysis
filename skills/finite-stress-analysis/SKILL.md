@@ -55,9 +55,9 @@ Other commands: `fsa render runs/<name> <case> --field vm|layer_<orientation> [-
 
 ## Gotchas
 
-- fsa forces CalculiX's solver single-threaded: the multithreaded solver in Debian's CalculiX gave wrong
+- fsa forces CalculiX's solver single-threaded: the multithreaded solver in an older CalculiX gave wrong
   stresses. Don't work around it.
-- Memory: ~170k nodes needs ~4.5 GB, ~330k needs ~11.5 GB (a 12 GB Docker VM's limit). If the run dies,
+- Memory: ~170k nodes needs ~4.6 GB, ~330k needs ~11 GB (a 12 GB Docker VM's limit). If the run dies,
   raise `mesh.fine` or shrink the `refine` boxes.
 - A rigid `load_path` makes whatever it touches infinitely stiff. Fine for a monitor or a steel bracket; for
   a soft neighbour, expect it to over-stiffen the part locally.
