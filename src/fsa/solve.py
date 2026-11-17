@@ -40,7 +40,8 @@ def write_inp(path, ids, xyz, tets, fixed, paths, cases, mat):
 
 
 def run_ccx(workdir):
-    # Multithreaded spooles in Debian's CalculiX 2.20 returns wrong stresses: force one thread.
+    # Multithreaded spooles in Debian's CalculiX 2.20 returned wrong stresses. Ubuntu's 2.21 matched on 4
+    # threads (monitor-mount examples), but the cause was never found, so keep forcing one thread.
     env = {**os.environ, "CCX_NPROC_EQUATION_SOLVER": "1"}
     r = subprocess.run(["ccx", "-i", "model"], cwd=workdir, capture_output=True, text=True, env=env, check=False)
     if "Job finished" not in r.stdout:
